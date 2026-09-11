@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">AI Translate</title>
+  <desc id="desc">A 与文的几何字形，通过电路相连，搭配 AI 星芒与青紫渐变。</desc>
+  <defs>
+    <linearGradient id="tile" x1="12" y1="8" x2="116" y2="124" gradientUnits="userSpaceOnUse"><stop stop-color="#14253E"/><stop offset="1" stop-color="#090E20"/></linearGradient>
+    <linearGradient id="signal" x1="25" y1="30" x2="103" y2="98" gradientUnits="userSpaceOnUse"><stop stop-color="#54F0ED"/><stop offset=".5" stop-color="#72B8FF"/><stop offset="1" stop-color="#AC82FF"/></linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#tile)"/>
+  <rect x="4.75" y="4.75" width="118.5" height="118.5" rx="29.25" stroke="url(#signal)" stroke-opacity=".32" stroke-width="1.5"/>
+  <g stroke="url(#signal)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M25 69 40 32 55 69M31 55H49"/>
+    <path d="M81 57V63M65 66H101M91 66C88 83 78 93 65 98M72 74C78 87 88 94 101 98"/>
+  </g>
+  <path d="M91 24 94 33 103 36 94 39 91 48 88 39 79 36 88 33Z" fill="url(#signal)"/>
+  <path d="M28 85V95H49L55 89" stroke="url(#signal)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="28" cy="83" r="3" fill="#54F0ED"/>
+  <circle cx="57" cy="87" r="3" fill="#87A3FF"/>
+</svg>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>OpenTransAI · 浏览器测试</title><style>
+body{font:16px/1.7 system-ui;max-width:900px;margin:48px auto;padding:0 24px;color:#20242c;background:#fff} h1{font-size:28px;font-weight:550} p{margin:20px 0} .samples{padding:24px;background:#f5f6fa;border-radius:12px}button{font:inherit;padding:9px 16px;border:1px solid #ccd1de;border-radius:7px;background:white;cursor:pointer} textarea,input{display:block;width:95%;font:inherit;padding:12px;margin:18px 0} #results{font-size:13px;white-space:pre-wrap}iframe{border:0;width:100%;height:160px}a{color:#4663d4} .note{font-size:13px;color:#69707e}
+</style></head>
+<body>
+  <h1>划词翻译 · 浏览器验收</h1>
+  <p class="note">本页运行实际 content.js，使用独立的测试 AI 响应，不访问真实 AI 服务。不会保存真实 Key。</p>
+  <p><a href="/preview/popup.html">悬浮配置测试</a></p>
+  <div class="samples">
+    <p id="reference">Design systems that fail gracefully. Keep the interface simple, and make every interaction feel immediate.</p>
+    <p id="interrupted">SIMULATE_INTERRUPTION</p>
+    <p id="thinking">SIMULATE_THINKING</p>
+    <p id="thinking-error">SIMULATE_THINKING_ERROR</p>
+    <p id="english">Stay curious. Keep exploring.</p>
+    <p id="chinese">保持好奇，继续探索。</p>
+    <p id="japanese">好奇心を持ち続けてください。</p>
+    <p id="injection">&lt;img src=x onerror=alert(1)&gt;</p>
+    <p id="error">SIMULATE_ERROR</p>
+  </div>
+  <textarea aria-label="可编辑文本测试">Select some text in this input.</textarea>
+  <input type="password" aria-label="密码框不显示按钮" value="not-a-real-password">
+  <button id="preview-stream">预览流式翻译</button>
+  <button id="preview-long">预览长内容浮窗</button>
+  <button id="preview-thinking">预览思考状态</button>
+  <button id="run-tests">运行交互自动测试</button>
+  <pre id="results" role="status">等待测试</pre>
+  <script type="module" src="/tests/browser-runner.js"></script>
+</body>
+</html>

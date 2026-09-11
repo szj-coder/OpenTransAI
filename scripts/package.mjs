@@ -1,0 +1,16 @@
+import { cp, mkdir, rm } from 'node:fs/promises';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+execFileSync(process.execPath, [resolve(root, 'scripts/check.mjs')], { stdio: 'inherit' });
+const output = resolve(root, 'dist');
+const unpacked = resolve(output, 'OpenTransAI');
+await mkdir(output, { recursive: true });
+await rm(unpacked, { recursive: true, force: true });
+await cp(resolve(root, 'extension'), unpacked, { recursive: true });
+await cp(resolve(root, 'README.md'), resolve(unpacked, 'README.md'));
+const zip = resolve(output, 'OpenTransAI.zip');
+await rm(zip, { force: true });
+execFileSync('zip', ['-qr', zip, 'OpenTransAI'], { cwd: output });
+console.log(`Unpacked: ${unpacked}\nZIP: ${zip}`);

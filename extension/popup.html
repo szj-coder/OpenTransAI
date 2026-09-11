@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>翻译设置 · OpenTransAI</title>
+  <link rel="icon" href="icons/ai-translate-light.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body class="popup-page">
+  <div id="translator-settings">
+  <main class="settings" aria-label="翻译插件配置">
+    <header class="heading">
+      <img class="mark" src="icons/ai-translate-light.svg" width="52" height="52" alt="">
+      <div><h1>翻译设置</h1><p>连接你的 AI 翻译服务</p></div>
+    </header>
+    <div class="toggle-row"><label for="enabled">划词翻译</label><input id="enabled" type="checkbox" class="toggle" role="switch" disabled></div>
+    <form id="settings-form">
+      <fieldset id="fields" disabled>
+        <div class="field">
+          <label for="provider">协议类型</label>
+          <div class="select-wrap"><select id="provider" name="provider">
+            <option value="openai">OpenAI 兼容</option><option value="anthropic">Anthropic</option><option value="gemini">Google Gemini</option>
+          </select></div>
+        </div>
+        <div class="field">
+          <label for="base-url">API 地址</label>
+          <input id="base-url" name="baseUrl" type="url" placeholder="https://api.example.com/v1" required autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <div class="model-label-row"><label for="model">模型</label><label class="thinking-label" for="thinking">思考模式<input id="thinking" type="checkbox" class="toggle" role="switch" aria-describedby="thinking-hint"></label></div>
+          <input id="model" name="model" placeholder="填写 API 服务商提供的模型 ID" required autocomplete="off" spellcheck="false" maxlength="200">
+          <p id="thinking-hint" class="field-hint">思考开关目前支持 DeepSeek 官方接口</p>
+        </div>
+        <div class="field">
+          <label for="api-key">API Key</label>
+          <div class="secret"><input id="api-key" name="apiKey" type="password" placeholder="输入 API Key" required autocomplete="off" spellcheck="false" maxlength="2000"><button id="reveal" class="reveal" type="button" aria-controls="api-key" aria-pressed="false">显示</button></div>
+        </div>
+        <div class="field">
+          <label for="default-language">默认语言</label>
+          <div class="select-wrap"><select id="default-language" name="defaultLanguage" aria-describedby="language-hint"></select></div>
+          <p id="language-hint">默认翻译为此语言</p>
+        </div>
+        <div class="actions"><button id="test" class="secondary" type="button">测试连接</button><button id="save" class="save" type="submit">保存配置</button></div>
+      </fieldset>
+      <p id="notice" class="notice" role="status" aria-live="polite"></p>
+    </form>
+  </main>
+  </div>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
