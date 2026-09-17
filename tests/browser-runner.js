@@ -239,6 +239,57 @@ document.getElementById('run-tests').addEventListener('click', async () => {
     input.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 })); await delay(120);
     assert(root().host.hidden, '密码框显示按钮'); input.blur();
   });
+  await check('切换协议保留当前配置，保存后回显所选协议及字段', async () => {
+    const storageKey = 'opentransai-test-settings';
+    const previous = sessionStorage.getItem(storageKey);
+    const frame = document.createElement('iframe');
+    frame.hidden = true;
+    const load = () => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(Error('配置预览加载超时')), 5000);
+      frame.onload = () => { clearTimeout(timer); resolve(); };
+      frame.src = '/preview/popup.html';
+      if (!frame.isConnected) document.body.append(frame);
+    });
+    try {
+      sessionStorage.removeItem(storageKey);
+      await load();
+      const field = id => frame.contentDocument.getElementById(id);
+      const set = (id, value, type = 'input') => {
+        field(id).value = value;
+        field(id).dispatchEvent(new frame.contentWindow.Event(type, { bubbles: true }));
+      };
+      assert(!field('fields').disabled, '配置未加载完成');
+      set('base-url', 'https://api.deepseek.com');
+      set('model', 'demo-model');
+      set('api-key', 'demo-key-not-valid');
+      set('default-language', 'ja', 'change');
+      field('thinking').click();
+      const retained = model => {
+        assert(field('base-url').value === 'https://api.deepseek.com', '切换协议清空或替换了 API 地址');
+        assert(field('model').value === model, '切换协议清空或恢复了旧模型');
+        assert(field('api-key').value === 'demo-key-not-valid', '切换协议清空或替换了 Key');
+        assert(field('default-language').value === 'ja' && field('enabled').checked, '切换协议改变了其他配置');
+      };
+      for (const protocol of ['anthropic', 'gemini', 'openai']) {
+        set('provider', protocol, 'change'); retained('demo-model');
+        assert(field('thinking').disabled === (protocol !== 'openai'), '思考开关适用范围错误');
+        assert(field('thinking').checked === (protocol === 'openai'), '往返切换丢失思考偏好或错误启用思考');
+      }
+      set('provider', 'anthropic', 'change');
+      set('model', 'updated-demo-model');
+      set('provider', 'openai', 'change'); retained('updated-demo-model');
+      set('provider', 'gemini', 'change'); retained('updated-demo-model');
+      field('save').click(); await delay(100);
+      assert(frame.contentDocument.getElementById('popup-preview-closed'), '保存未成功关闭配置');
+      await load(); retained('updated-demo-model');
+      assert(field('provider').value === 'gemini', '保存了旧协议');
+      assert(field('thinking').disabled && !field('thinking').checked, '不支持的协议保存了思考开关');
+    } finally {
+      frame.remove();
+      if (previous === null) sessionStorage.removeItem(storageKey);
+      else sessionStorage.setItem(storageKey, previous);
+    }
+  });
   output.textContent += `\n\n${results.filter(x => x.startsWith('PASS')).length}/${results.length} 通过（本地测试响应）`;
 });
 

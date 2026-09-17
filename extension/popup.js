@@ -1,4 +1,4 @@
-import { LANGUAGES, PROVIDERS, DEFAULT_SETTINGS, validateSettings, permissionOrigin, supportsThinking } from './lib/core.js';
+import { LANGUAGES, DEFAULT_SETTINGS, validateSettings, permissionOrigin, supportsThinking } from './lib/core.js';
 import { send, notice } from './lib/client.js';
 
 const $ = id => document.getElementById(id);
@@ -7,9 +7,8 @@ const provider = $('provider');
 const language = $('default-language');
 const fields = $('fields');
 const message = $('notice');
-const drafts = new Map();
-let currentProtocol = 'openai';
 let serviceProvider = 'openai';
+let thinkingPreference = false;
 let enabled = true;
 let busy = false;
 
@@ -23,31 +22,32 @@ function readForm() {
 function updateThinkingControl() {
   const supported = supportsThinking({ provider: serviceProvider, baseUrl: $('base-url').value });
   $('thinking').disabled = !supported;
-  if (!supported) $('thinking').checked = false;
+  $('thinking').checked = supported && thinkingPreference;
   $('thinking-hint').textContent = supported
     ? ($('thinking').checked ? '开启思考 · 可能增加等待时间' : '关闭思考 · 优先快速翻译')
     : '思考开关目前支持 DeepSeek 官方接口';
 }
 function showService(settings) {
   serviceProvider = settings.provider;
-  currentProtocol = protocolFor(settings.provider);
-  provider.value = currentProtocol;
+  provider.value = protocolFor(settings.provider);
   $('base-url').value = settings.baseUrl;
   $('model').value = settings.model;
   $('api-key').value = settings.apiKey;
-  $('thinking').checked = settings.thinking === true;
+  thinkingPreference = settings.thinking === true;
   updateThinkingControl();
   $('api-key').type = 'password';
   $('reveal').textContent = '显示';
   $('reveal').setAttribute('aria-pressed', 'false');
 }
 provider.addEventListener('change', () => {
-  drafts.set(currentProtocol, readForm());
-  const next = provider.value;
-  showService(drafts.get(next) || { provider: next, ...PROVIDERS[next], baseUrl: '', apiKey: '' });
+  serviceProvider = provider.value;
+  updateThinkingControl();
 });
 $('base-url').addEventListener('input', updateThinkingControl);
-$('thinking').addEventListener('change', updateThinkingControl);
+$('thinking').addEventListener('change', () => {
+  thinkingPreference = $('thinking').checked;
+  updateThinkingControl();
+});
 function markDirty() {
   notice(message, '');
 }
@@ -77,7 +77,6 @@ async function act(testOnly) {
     const data = await send(testOnly ? 'TEST' : 'SETTINGS_SAVE', { settings });
     if (testOnly) notice(feedback, `连接成功 · ${(data.elapsedMs / 1000).toFixed(1)} 秒 · ${data.translation}`, 'success');
     else {
-      drafts.set(currentProtocol, settings);
       notice(message, '配置已保存。', 'success');
       window.close();
     }
