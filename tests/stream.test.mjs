@@ -91,3 +91,34 @@ test('没有思考事件时不伪造思考阶段，取消后不发送后续状�
   }), /取消/);
   assert.deepEqual(cancelledPhases, ['waiting', 'thinking']);
 });
+
+test('显式目标流式请求保留目标方向和已知混合源语言', async () => {
+  const expected = { sourceLanguage: 'mul', targetLanguage: 'ja', translation: 'こんにちは' };
+  const updates = [];
+  assert.deepEqual(await translate('hello', settings, { targetLanguage: 'ja', sourceLanguage: 'mul', onProgress: value => updates.push(value), fetchImpl: async () => response(events('openai', JSON.stringify(expected))) }), expected);
+  assert(updates.length); assert(updates.every(value => value.targetLanguage === 'ja'));
+});
+test('SSE 注释和推理事件不重置业务超时或暴露活动正文', async () => {
+  for (const wire of [': ping\n\n', event({ choices: [{ delta: { reasoning_content: 'PRIVATE_REASONING' } }] })]) {
+    let interval; const activities = [];
+    const body = new ReadableStream({ start(controller) { interval = setInterval(() => controller.enqueue(new TextEncoder().encode(wire)), 3); }, cancel() { clearInterval(interval); } });
+    const started = Date.now();
+    await assert.rejects(translate('hello', settings, { timeoutMs: 15, maxDurationMs: 200, onProgress() {}, onActivity: value => activities.push(value), fetchImpl: async () => new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }) }), /超时/);
+    assert(Date.now() - started < 150, 'comment/reasoning traffic prolonged business inactivity');
+    assert.deepEqual(activities, []);
+  }
+});
+test('业务内容增量重置超时并发送无正文活动通知', async () => {
+  let interval; let index = 0; const activities = [];
+  const parts = [raw.slice(0, 20), raw.slice(20, 45), raw.slice(45), '[DONE]'];
+  const body = new ReadableStream({ start(controller) { interval = setInterval(() => { const part = parts[index++]; controller.enqueue(new TextEncoder().encode(part === '[DONE]' ? event(part) : event({ choices: [{ delta: { content: part } }] }))); if (index === parts.length) { clearInterval(interval); controller.close(); } }, 12); }, cancel() { clearInterval(interval); } });
+  assert.deepEqual(await translate('hello', settings, { timeoutMs: 30, onProgress() {}, onActivity: value => activities.push(value), fetchImpl: async () => new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }) }), result);
+  assert.equal(activities.length, 3); assert.equal(activities.every(value => value === undefined), true);
+});
+
+test('纯空白正文增量不是业务进展', async () => {
+  let interval; let chunks = 0; const activities = [];
+  const body = new ReadableStream({ start(controller) { interval = setInterval(() => { chunks++; controller.enqueue(new TextEncoder().encode(event({ choices: [{ delta: { content: ' ' } }] }))); }, 5); }, cancel() { clearInterval(interval); } });
+  await assert.rejects(translate('hello', settings, { timeoutMs: 20, maxDurationMs: 150, onProgress() {}, onActivity: value => activities.push(value), fetchImpl: async () => new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }) }), /超时/);
+  assert(chunks < 15); assert.deepEqual(activities, []);
+});

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>本地诊断日志 · OpenTransAI</title>
+  <link rel="icon" href="icons/ai-translate-light.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="diagnostics.css">
+</head>
+<body class="diagnostics-page">
+  <main>
+    <header class="heading"><img class="mark" src="icons/ai-translate-light.svg" alt=""><div><h1>本地诊断日志</h1><p>OpenTransAI · 异常排查</p></div></header>
+    <p>保留最近 100 条异常，最多 7 天；打开日志或产生新异常时清理过期记录。仅保存在本机，不上传。</p>
+    <p>记录失败阶段、协议、模型、HTTP 状态和格式原因，不记录 Key、图片、原文、译文或完整接口响应。</p>
+    <div class="actions"><button id="refresh" class="secondary" type="button">刷新</button><button id="copy" class="secondary" type="button" disabled>复制日志</button><button id="clear" class="secondary" type="button" disabled>清空日志</button></div>
+    <p id="notice" class="notice" role="status" aria-live="polite">正在读取…</p>
+    <p id="count"></p>
+    <section id="entries" aria-label="异常记录"></section>
+    <div id="manual-copy" hidden><label for="copy-text">复制失败，请手动复制以下日志</label><textarea id="copy-text" readonly spellcheck="false"></textarea></div>
+  </main>
+  <script type="module" src="diagnostics.js"></script>
+</body>
+</html>

@@ -1,365 +1,188 @@
 (() => {
   if (globalThis.__openTransAILoaded) return;
   globalThis.__openTransAILoaded = true;
-
-  const host = document.createElement('div');
-  host.id = 'opentransai-root';
-  host.hidden = true;
-  host.setAttribute('popover', 'manual');
-  host.style.cssText = 'all:initial!important;position:fixed!important;inset:auto!important;margin:0!important;border:0!important;padding:0!important;background:transparent!important;overflow:visible!important;z-index:2147483647!important;color-scheme:light dark!important;';
-  const shadow = host.attachShadow({ mode: 'closed' });
-  const style = document.createElement('style');
-  style.textContent = `
-    :host{font:14px/1.5 system-ui,-apple-system,"PingFang SC",sans-serif;color-scheme:light dark}
-    *{box-sizing:border-box}[hidden]{display:none!important}
-    .surface{--text:light-dark(#202735,#e6eaf2);--muted:light-dark(#637087,#b0bbce);--line:light-dark(#edf0f5,#343c4b);--bg:light-dark(#fff,#222834);font:14px/1.5 system-ui,-apple-system,"PingFang SC",sans-serif;font-weight:430;color:var(--text);text-align:left;direction:ltr;letter-spacing:normal;word-spacing:normal;text-transform:none}
-    button{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;border-radius:6px;min-height:28px;padding:4px 7px;white-space:nowrap}
-    button:hover{background:light-dark(#edf0f7,#343c4c)}button:focus-visible,summary:focus-visible{outline:2px solid light-dark(#576add,#a7b6ff);outline-offset:2px}button:disabled{cursor:wait;opacity:.5}
-    .trigger{width:26px;height:26px;min-height:26px;padding:0;border:1px solid #d6e0f0;border-radius:6px;background:linear-gradient(140deg,#fff,#eef3ff);box-shadow:0 1px 3px #42578b14;overflow:hidden}.trigger:hover{background:linear-gradient(140deg,#f9fbff,#e2ebff);border-color:#b9cbea}.trigger img{display:block;width:24px;height:24px}.brand img{width:18px;height:18px;flex:none}
-    .panel{display:flex;flex-direction:column;width:min(440px,calc(var(--viewport-width,100vw) - 24px));max-height:var(--panel-max-height,70vh);border:1px solid light-dark(#dfe3ed,#3a4252);border-radius:10px;background:var(--bg);box-shadow:0 6px 20px light-dark(#233a5712,#00000033);overflow:hidden;overscroll-behavior:contain}
-    .head{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);flex-wrap:wrap;flex:none}.brand{display:flex;align-items:center;gap:5px;font-weight:500;margin-right:3px}.lang{display:flex;align-items:center;gap:5px;color:light-dark(#606b7e,#b7c1d2);font-size:12px}.target{display:inline-flex;align-items:center;min-height:28px;background:light-dark(#f3f5f9,#303848);border-radius:5px;padding:0 6px}.close{margin-left:auto;width:28px;font-size:20px;line-height:1;padding:4px}
-    .content{display:flex;flex-direction:column;padding:10px 12px 8px;min-height:0;overflow:hidden}.original{flex:none;margin:0 0 9px;padding:0 0 9px;border-bottom:1px solid var(--line)}.original summary{cursor:pointer;color:var(--muted);font-size:12px;list-style:none;display:flex;align-items:center;gap:4px}.original summary::-webkit-details-marker{display:none}.original summary::before{content:'›';font-size:16px;line-height:12px;transform:rotate(0)}.original[open] summary::before{transform:rotate(90deg)}.original p{color:light-dark(#687286,#adb7c9);font-size:12px;line-height:1.6;margin:4px 0 0;max-height:min(144px,var(--source-max-height,144px));white-space:pre-wrap;overflow-wrap:anywhere}.original p,.translation-scroll{overflow:auto;overscroll-behavior:contain;scrollbar-width:none}.original p::-webkit-scrollbar,.translation-scroll::-webkit-scrollbar{display:none;width:0;height:0}.translation-scroll{min-height:0;flex:0 1 auto;outline-offset:-2px}.count{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--muted)}
-    .translation{font-size:14px;line-height:1.7;margin:0;min-height:48px;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}.translation:empty::after{content:' ';display:inline-block;width:7px;height:7px;margin:8px 0;border-radius:50%;background:var(--muted);animation:pulse 1s ease-in-out infinite}.translation.streaming:not(:empty)::after{content:' ';display:inline-block;width:5px;height:13px;margin-left:3px;border-radius:2px;background:var(--muted);vertical-align:-2px;animation:pulse 1s ease-in-out infinite}.chunk{animation:appear 180ms ease-out both}
-    .bottom{display:flex;align-items:center;gap:6px;padding:5px 8px 7px;color:var(--muted);font-size:12px;flex-wrap:wrap;flex:none}.status{margin-right:auto;padding-left:4px}.copy{color:light-dark(#485fbc,#b1c1ff);background:light-dark(#f0f3ff,#323c59)}.action-icon{font-size:14px;line-height:1}.error{font-size:12px;color:light-dark(#b43434,#ffaaaa);line-height:1.6;overflow-wrap:anywhere;margin:8px 0 0}.copy-note{font-size:12px;color:var(--muted);margin:8px 0 0}
-    .activity{padding:4px 0 6px}.activity-heading{display:flex;align-items:center;gap:8px;font-size:13px}.activity-label{font-weight:500}.activity-time{margin-left:auto;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}.activity-hint{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
-    @keyframes appear{from{opacity:.2}to{opacity:1}}@keyframes pulse{50%{opacity:.3}}
-    @media(max-width:400px){.head{gap:4px}.brand{font-size:12px}}@media(pointer:coarse){button{min-height:44px}.close{width:44px}.original summary{min-height:44px}}
-    @media(prefers-reduced-motion:reduce){*,*::after{animation:none!important;transition:none!important}}
-  `;
-  const surface = document.createElement('div');
-  surface.className = 'surface';
-  shadow.append(style, surface);
-  let snapshot = null;
-  let revision = 0;
-  let requestId = null;
-  let streamPort = null;
-  let heartbeat = null;
-  let activityTimer = null;
-  let mode = 'hidden';
-  let pendingSelection = null;
-  let focusBefore = null;
-
-  function element(tag, className, text) {
-    const node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
-  function button(label, className, action, handler) {
-    const node = element('button', className, label);
-    node.type = 'button';
-    node.dataset.action = action;
-    node.addEventListener('click', handler);
-    return node;
-  }
-  async function send(type, payload = {}) {
-    let response;
-    try { response = await chrome.runtime.sendMessage({ type, ...payload }); }
-    catch { throw new Error('扩展已更新或连接断开，请刷新网页后重试。'); }
-    if (!response?.ok) throw new Error(response?.error || '翻译失败，请重试。');
-    return response.data;
-  }
-  function cancel() {
-    clearInterval(heartbeat);
-    clearInterval(activityTimer);
-    if (streamPort) { const port = streamPort; streamPort = null; port.disconnect(); }
-    requestId = null;
-  }
-  function hide(restoreFocus = false) {
+  const A = globalThis.OpenTransAIPage;
+  if (!A?.alive()) return;
+  const isTop = window === window.top;
+  let task = null, revision = 0, port = null, heartbeat, activityTimer, focusBefore, openedAt = 0, capture = null, captureHidden = false, captureIntent = null, entries = null, view = null;
+  const timestamp = () => performance.timeOrigin + performance.now();
+  A.onInvalidated(() => {
+    revision++; captureIntent = null; task = null; focusBefore = null;
+    disconnect(); capture?.cancel(); view?.close(); entries?.hide();
+  });
+  entries = A.createEntries({ suspended: () => captureHidden || capture?.active || false, onError: error => { if (isTop) showError(error); } });
+  if (!A.alive()) return;
+  view = isTop ? A.createPanel({ close, cancel: () => cancelTask(), retry: () => void run({ force: true }).catch(showError), language: code => { if (task) { task.explicitTarget = code; void run({ switching: true }).catch(showError); } }, settings: () => void A.send('OPEN_SETTINGS').catch(showError), capture: () => void beginCapture(), access: () => void A.send('REQUEST_ACCESS', { purpose: 'image', sourceId: task?.source.id }).catch(showError) }) : null;
+  if (!A.alive()) return;
+  if (isTop) capture = A.createCapture({ onStart: async () => { entries.hide(); view.pause(true); await A.send('CAPTURE_MODE', { active: true }); }, onCancel: () => { captureIntent = null; if (!A.alive()) return; view.pause(false); void A.send('CAPTURE_MODE', { active: false }).catch(() => {}); }, onAccess: () => void beginCapture(true), onImage: (image, anchor) => { void A.send('CAPTURE_MODE', { active: false }).catch(() => {}); void openSource({ kind: 'screenshot', id: A.uid(), image }, anchor).catch(showError); } });
+  function disconnect() { clearInterval(heartbeat); clearInterval(activityTimer); if (port) { const old = port; port = null; try { old.disconnect(); } catch (error) { A.runtimeError(error); } } }
+  function invalidate() {
     revision++;
-    cancel();
-    clearTimeout(pendingSelection);
-    mode = 'hidden';
-    surface.replaceChildren();
-    host.hidden = true;
-    // `all: initial` on the host overrides the UA [hidden] style.
-    host.style.setProperty('display', 'none', 'important');
-    if (host.matches(':popover-open')) host.hidePopover();
-    if (restoreFocus && focusBefore?.isConnected) focusBefore.focus({ preventScroll: true });
+    const id = task?.requestId; disconnect();
+    if (id && A.alive()) void A.send('CANCEL', { requestId: id }).catch(() => {});
   }
-  function position() {
-    if (!snapshot || mode === 'hidden') return;
-    const viewport = window.visualViewport;
-    const viewportWidth = Math.min(document.documentElement.clientWidth || innerWidth, viewport?.width || innerWidth);
-    const viewportHeight = viewport?.height || innerHeight;
-    const left = viewport?.offsetLeft || 0;
-    const top = viewport?.offsetTop || 0;
-    const maxHeight = Math.floor(viewportHeight * .7);
-    host.style.setProperty('--viewport-width', `${viewportWidth}px`);
-    host.style.setProperty('--panel-max-height', `${maxHeight}px`);
-    const panel = surface.querySelector('.panel');
-    if (panel) {
-      // Reserve fixed chrome and give the source at most 40% of the remaining
-      // reading space, keeping the translation usable on short viewports too.
-      const fixedHeight = panel.querySelector('.head').getBoundingClientRect().height
-        + panel.querySelector('.bottom').getBoundingClientRect().height
-        + panel.querySelector('summary').getBoundingClientRect().height + 43;
-      host.style.setProperty('--source-max-height', `${Math.max(0, (maxHeight - fixedHeight) * .4)}px`);
-    }
-    const width = host.getBoundingClientRect().width;
-    const height = host.getBoundingClientRect().height;
-    const x = Math.max(left + 8, Math.min(snapshot.x + 8, left + viewportWidth - width - 8));
-    const below = snapshot.bottom + 10;
-    const above = snapshot.top - height - 10;
-    const preferredY = below + height <= top + viewportHeight - 8 ? below : above;
-    const y = Math.max(top + 8, Math.min(preferredY, top + viewportHeight - height - 8));
-    host.style.setProperty('left', `${x}px`, 'important');
-    host.style.setProperty('top', `${y}px`, 'important');
+  function close({ restoreFocus = true } = {}) { captureIntent = null; capture?.cancel(); invalidate(); view?.close(); task = null; entries.hide(); if (restoreFocus && focusBefore?.isConnected) focusBefore.focus?.({ preventScroll: true }); focusBefore = null; }
+  function dismiss(at, explicit = false) {
+    // Frame clicks are asynchronous: a click preceding this panel must not close it.
+    if (task && (explicit || !view?.pinned) && !capture?.active && !captureHidden && Number.isFinite(at) && at >= openedAt) close({ restoreFocus: explicit });
   }
-  function mount(node) {
-    if (!host.isConnected) document.documentElement.append(host);
-    surface.replaceChildren(node);
-    host.hidden = false;
-    host.style.setProperty('display', 'block', 'important');
-    if (host.showPopover && !host.matches(':popover-open')) host.showPopover();
-    position();
+  function cancelTask() { if (!A.alive() || !task) return; invalidate(); if (!A.alive() || !task) return; task.busy = false; task.switching = false; task.state = 'cancelled'; view.render(task); }
+  function showError(error) {
+    if (!A.alive() || !view) return;
+    if (!task) { task = { source: { kind: 'text', text: '' }, kind: 'text', defaultLanguage: 'zh-CN', state: 'error', busy: false, translation: '' }; openedAt = timestamp(); view.open(task); }
+    task.busy = false; task.switching = false; task.state = 'error'; task.error = error.message; task.code = error.code || 'SERVICE'; view.render(task);
   }
-  function brandIcon() {
-    const icon = element('img');
-    icon.src = chrome.runtime.getURL('icons/ai-translate-light.svg');
-    icon.alt = '';
-    return icon;
-  }
-  function showButton() {
-    mode = 'button';
-    const trigger = button('', 'trigger', 'translate', () => void start());
-    trigger.setAttribute('aria-label', '翻译选中文字');
-    trigger.title = '翻译选中文字';
-    trigger.append(brandIcon());
-    mount(trigger);
-  }
-  function label(code) {
-    if (code === 'zh-CN') return '简体中文';
-    if (code === 'zh-TW') return '繁體中文';
-    try { return new Intl.DisplayNames(['zh-CN'], { type: 'language' }).of(code); } catch { return code; }
-  }
-  function showPanel() {
-    mode = 'loading';
-    const panel = element('section', 'panel');
-    panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-label', 'OpenTransAI 翻译结果');
-    panel.setAttribute('aria-busy', 'true');
-    const head = element('div', 'head');
-    const brand = element('span', 'brand');
-    brand.append(brandIcon(), element('span', '', 'AI 翻译'));
-    const direction = element('div', 'lang');
-    const source = element('span', '', '自动识别');
-    const target = element('span', 'target', label(snapshot.defaultLanguage || 'zh-CN'));
-    direction.append(source, element('span', '', '→'), target);
-    const close = button('×', 'close', 'close', () => hide(true));
-    close.setAttribute('aria-label', '关闭翻译框');
-    close.title = '关闭 · Esc';
-    head.append(brand, direction, close);
-    const body = element('div', 'content');
-    const original = element('details', 'original');
-    const summary = element('summary', '', '原文');
-    const count = element('span', 'count', `${Array.from(snapshot.text).length} 字`);
-    count.title = '字符数（含空格和换行）';
-    summary.append(count);
-    const originalText = element('p', '', snapshot.text);
-    originalText.setAttribute('dir', 'auto');
-    originalText.tabIndex = 0;
-    originalText.setAttribute('aria-label', '原文内容');
-    original.append(summary, originalText);
-    original.addEventListener('toggle', position);
-    const translated = element('div', 'translation-scroll');
-    translated.tabIndex = 0;
-    translated.setAttribute('role', 'region');
-    translated.setAttribute('aria-label', '译文内容');
-    const activity = element('div', 'activity');
-    const activityHeading = element('div', 'activity-heading');
-    const activityLabel = element('span', 'activity-label', '正在连接 AI 服务');
-    const elapsed = element('span', 'activity-time', '已用时 0 秒');
-    elapsed.setAttribute('aria-hidden', 'true');
-    const startedAt = performance.now();
-    activityTimer = setInterval(() => { elapsed.textContent = `已用时 ${Math.floor((performance.now() - startedAt) / 1000)} 秒`; }, 1000);
-    activityHeading.append(activityLabel, elapsed);
-    const activityHint = element('p', 'activity-hint', '正在准备翻译请求。');
-    activity.append(activityHeading, activityHint);
-    const result = element('p', 'translation streaming');
-    result.hidden = true;
-    result.dataset.result = '';
-    result.setAttribute('dir', 'auto');
-    // Announce completion via the status, rather than every token.
-    const error = element('p', 'error');
-    error.hidden = true;
-    error.setAttribute('role', 'alert');
-    translated.append(activity, result, error);
-    body.append(original, translated);
-    const bottom = element('div', 'bottom');
-    const status = element('span', 'status', '正在连接…');
-    status.setAttribute('role', 'status');
-    const retry = button('重译', 'retry', 'retry', () => void start());
-    retry.prepend(element('span', 'action-icon', '↻'));
-    retry.disabled = true;
-    let translation = '';
-    const copy = button('复制', 'copy', 'copy', async () => {
-      try { await copyText(translation); status.textContent = '已复制'; }
-      catch {
-        status.textContent = '复制失败';
-        if (!translated.querySelector('.copy-note')) translated.append(element('p', 'copy-note', '可选中译文后按 Ctrl / ⌘ + C 复制。'));
-      }
-    });
-    copy.prepend(element('span', 'action-icon', '⧉'));
-    copy.disabled = true;
-    bottom.append(status, retry, copy);
-    panel.append(head, body, bottom);
-    mount(panel);
-    const update = data => {
-      const nearBottom = translated.scrollHeight - translated.scrollTop - translated.clientHeight < 36;
-      activity.hidden = true; clearInterval(activityTimer); result.hidden = false;
-      status.textContent = '正在生成译文…';
-      source.textContent = label(data.sourceLanguage);
-      target.textContent = label(data.targetLanguage);
-      result.lang = data.targetLanguage;
-      const previous = translation;
-      translation = data.translation;
-      if (translation.startsWith(previous)) {
-        const delta = translation.slice(previous.length);
-        if (delta) {
-          const chunk = element('span', 'chunk', delta);
-          result.append(chunk);
-          const settle = () => { if (chunk.isConnected) { chunk.replaceWith(document.createTextNode(delta)); result.normalize(); } };
-          chunk.addEventListener('animationend', settle, { once: true });
-          if (matchMedia('(prefers-reduced-motion: reduce)').matches) settle();
-        }
-      } else result.textContent = translation;
-      position();
-      if (nearBottom) translated.scrollTop = translated.scrollHeight;
-    };
-    const phaseLabels = {
-      waiting: ['等待模型响应', '请求已发出，正在等待 AI 服务返回。'],
-      thinking: ['模型正在思考', '模型正在分析原文，准备译文。'],
-      translating: ['正在生成译文', '已开始接收回答，译文即将显示。'],
-    };
-    let phaseIndex = -1;
-    return { close, update,
-      phase(value) {
-        if (translation || !Object.hasOwn(phaseLabels, value)) return;
-        const index = Object.keys(phaseLabels).indexOf(value);
-        if (index <= phaseIndex) return;
-        phaseIndex = index;
-        [activityLabel.textContent, activityHint.textContent] = phaseLabels[value];
-        activity.dataset.phase = value;
-        status.textContent = activityLabel.textContent;
-      },
-      complete(data) {
-        update(data); mode = 'result'; result.classList.remove('streaming');
-        panel.setAttribute('aria-busy', 'false'); status.textContent = 'AI 译文';
-        copy.disabled = false; retry.disabled = false;
-      },
-      fail(message) {
-        activity.hidden = true; clearInterval(activityTimer);
-        mode = 'error'; panel.setAttribute('aria-busy', 'false'); result.classList.remove('streaming');
-        if (!translation) result.hidden = true;
-        error.textContent = message; error.hidden = false;
-        status.textContent = translation ? '译文未完成' : '翻译失败';
-        retry.disabled = false; copy.disabled = true;
-      },
-    };
-  }
-  async function copyText(text) {
-    // Clipboard API needs HTTPS. execCommand is the fallback on ordinary HTTP pages.
-    if (navigator.clipboard?.writeText) {
-      try { await navigator.clipboard.writeText(text); return; } catch { /* Fall through. */ }
-    }
-    const input = element('textarea');
-    input.value = text;
-    input.style.cssText = 'position:fixed;opacity:0;left:0;top:0;width:1px;height:1px;';
-    surface.append(input);
-    input.focus(); input.select();
-    const copied = document.execCommand('copy');
-    input.remove();
-    if (!copied) throw new Error('Copy failed');
-  }
-  function start() {
-    if (!snapshot || mode === 'loading') return;
-    cancel();
-    const version = ++revision;
-    const text = snapshot.text;
-    focusBefore = document.activeElement === host ? focusBefore : document.activeElement;
-    const view = showPanel();
-    view.close.focus({ preventScroll: true });
-    if (text.length > 12000) { view.fail('一次最多翻译 12000 个字符，请缩小选区。'); return; }
-    requestId = `${Date.now()}-${version}`;
-    const id = requestId;
-    let finished = false;
+  async function beginCapture(forceAccess = false) {
+    if (!A.alive()) return;
+    const intent = captureIntent = A.uid();
     try {
-      const port = chrome.runtime.connect({ name: 'translation' });
-      streamPort = port;
-      const current = () => version === revision && !host.hidden && !finished;
-      port.onMessage.addListener(message => {
-        if (!current() || message.requestId !== id) return;
-        if (message.type === 'PHASE') view.phase(message.phase);
-        else if (message.type === 'PROGRESS') view.update(message.data);
-        else if (message.type === 'DONE' || message.type === 'ERROR') {
-          finished = true; requestId = null; clearInterval(heartbeat);
-          if (message.type === 'DONE') view.complete(message.data);
-          else view.fail(message.error || '翻译失败，请重试。');
-          if (streamPort === port) streamPort = null;
-          port.disconnect();
-        }
-      });
-      port.onDisconnect.addListener(() => {
-        if (current()) { finished = true; requestId = null; clearInterval(heartbeat); view.fail('翻译连接中断，请刷新网页后重试。'); }
-        if (streamPort === port) streamPort = null;
-      });
-      port.postMessage({ type: 'TRANSLATE', text, requestId: id });
-      // Port traffic keeps an active MV3 worker alive during long generations.
-      heartbeat = setInterval(() => { try { port.postMessage({ type: 'PING' }); } catch { cancel(); } }, 20000);
-    } catch { cancel(); view.fail('扩展已更新或连接断开，请刷新网页后重试。'); }
+      const status = await A.send('PREPARE_CAPTURE');
+      if (captureIntent !== intent) return;
+      if (forceAccess || !status.allowed) { await A.send('REQUEST_ACCESS', { purpose: 'capture', intent }); return; }
+      await capture.begin();
+    } catch (error) { if (captureIntent === intent) { captureIntent = null; if (task) view.notice(error.message); else showError(error); } }
   }
-  function capture(event) {
+  async function openSource(source, anchor) {
+    if (!A.alive() || !view) return;
+    captureIntent = null; capture?.cancel();
+    if (task?.busy && task.source.id === source.id) { view.focus(); return; }
+    const previous = task?.state === 'ready' || task?.state === 'same-language' ? task : null;
+    invalidate(); entries.hide();
+    if (!A.alive()) return;
+    focusBefore = A.isExtensionNode(document.activeElement) ? focusBefore : document.activeElement;
+    task = { id: A.uid(), source, kind: source.kind, anchor, defaultLanguage: 'zh-CN', state: source.kind === 'text' ? 'waiting' : 'reading', busy: true, translation: '', previous };
+    openedAt = timestamp(); view.open(task); await run({ reread: true });
+  }
+  async function run({ force = false, switching = false, reread = false } = {}) {
+    if (!A.alive() || !task) return;
+    invalidate(); const version = revision, current = task;
+    if (!A.alive() || !current) return;
+    const valid = () => A.alive() && revision === version && task === current;
+    current.requestId = A.uid(); current.busy = true; current.error = ''; current.code = ''; current.slow = false; current.switching = switching;
+    if (!switching) { current.translation = ''; view.resetScroll(); }
+    current.state = current.kind === 'text' ? 'waiting' : current.recognized ? 'translating' : 'reading'; view.render(current);
+    let lastProgress = Date.now();
+    const progress = () => { lastProgress = Date.now(); current.slow = false; };
+    activityTimer = setInterval(() => {
+      if (!valid() || !current.busy) return;
+      const idle = Date.now() - lastProgress;
+      if (idle >= 60000) { invalidate(); if (!A.alive()) return; current.busy = false; current.switching = false; current.state = 'error'; current.code = 'TIMEOUT'; current.error = '处理超时，请重试或缩小图片范围。'; view.render(current); return; }
+      if (idle >= 15000 && !current.slow) { current.slow = true; view.render(current); }
+    }, 1000);
+    try {
+      const config = await A.send('STATUS'); if (!valid()) return;
+      if (!config.enabled) throw Object.assign(new Error('翻译功能已关闭，请在扩展菜单中开启。'), { code: 'DISABLED' });
+      if (!config.configured) throw Object.assign(new Error('请先配置翻译服务。'), { code: 'CONFIG' });
+      if (current.configRevision && current.configRevision !== config.configRevision) current.recognized = null;
+      current.configRevision = config.configRevision; current.defaultLanguage = config.defaultLanguage;
+      if (!current.targetLanguage) current.targetLanguage = current.explicitTarget || config.defaultLanguage;
+      if (current.kind !== 'text') {
+        if (reread || !current.image) {
+          current.state = 'reading'; view.render(current);
+          const data = current.kind === 'screenshot' ? { image: current.source.image } : await A.send('READ_SOURCE', { sourceId: current.source.id, requestId: current.requestId });
+          if (!valid()) return;
+          current.image = data.image; current.imageDigest = await A.digest(data.image); if (!valid()) return; progress();
+          const cache = current.previous;
+          if (!force && cache?.imageDigest === current.imageDigest && cache.configRevision === config.configRevision) {
+            current.recognized = cache.recognized;
+            // Automatic direction may resolve to English instead of the default language.
+            if (cache.explicitTarget === current.explicitTarget) {
+              Object.assign(current, { translation: cache.translation, state: cache.state, targetLanguage: cache.targetLanguage, busy: false }); current.previous = null; disconnect(); view.render(current); return;
+            }
+          }
+          current.previous = null;
+        }
+      }
+      if (!valid()) return;
+      const payload = { type: current.kind === 'text' ? 'TRANSLATE' : 'TRANSLATE_IMAGE', requestId: current.requestId, taskId: current.id, configRevision: current.configRevision, imageDigest: current.imageDigest, sourceKind: current.kind };
+      if (current.kind === 'text') { payload.text = current.source.text; if (current.explicitTarget) payload.targetLanguage = current.explicitTarget; }
+      else { if (current.explicitTarget) payload.targetLanguage = current.explicitTarget; if (current.recognized) payload.recognized = current.recognized; else payload.image = current.image; }
+      const stream = A.connect({ name: 'translation' }); port = stream;
+      let finished = false;
+      stream.onMessage.addListener(message => {
+        if (!valid() || finished || message.requestId !== current.requestId) return;
+        if (message.type === 'ACTIVITY') { progress(); return; }
+        if (message.type === 'PHASE') { current.state = message.phase; progress(); }
+        if (message.type === 'RECOGNIZED') { current.recognized = message.data; progress(); }
+        if (message.type === 'PROGRESS') { Object.assign(current, message.data); current.state = 'translating'; current.switching = false; progress(); }
+        if (['DONE', 'ERROR'].includes(message.type)) {
+          finished = true; current.busy = false; current.switching = false;
+          if (message.type === 'DONE') { Object.assign(current, message.data); current.state = message.data.outcome === 'empty' ? 'empty' : message.data.outcome === 'same-language' ? 'same-language' : 'ready'; }
+          else { current.state = 'error'; current.error = message.error; current.code = message.code; }
+          disconnect();
+        }
+        if (valid()) view.render(current);
+      });
+      stream.onDisconnect.addListener(() => {
+        // Read lastError in its callback so Chrome does not report it as unchecked.
+        try { if (chrome.runtime?.lastError) A.runtimeError(chrome.runtime.lastError); } catch (error) { A.runtimeError(error); }
+        if (!valid() || finished) return;
+        finished = true; disconnect();
+        if (valid()) showError(Object.assign(new Error('翻译连接中断，请重试。'), { code: 'CONNECTION' }));
+      });
+      stream.postMessage(payload);
+      if (valid() && !finished) heartbeat = setInterval(() => { if (!valid()) return; try { stream.postMessage({ type: 'PING' }); } catch (error) { const failure = A.runtimeError(error); if (valid()) { disconnect(); showError(failure); } } }, 20000);
+    } catch (error) { if (valid()) { const failure = A.runtimeError(error); disconnect(); showError(error.code ? error : failure); } }
+  }
+  function selection(event) {
     const target = event.composedPath()[0];
     if (target instanceof HTMLInputElement && !['text', 'search', 'url', 'tel', 'email'].includes(target.type)) return null;
-    if (target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) {
-      const { selectionStart: from, selectionEnd: to } = target;
-      if (from === null || to === null || from === to) return null;
-      const text = target.value.slice(from, to).trim();
-      if (!text) return null;
-      return { text, x: event.clientX, top: event.clientY - 12, bottom: event.clientY + 5 };
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+      if (target.selectionStart === target.selectionEnd) return null;
+      const text = target.value.slice(target.selectionStart, target.selectionEnd).trim();
+      return text ? { text, anchor: { left: event.clientX, right: event.clientX, top: event.clientY - 12, bottom: event.clientY + 5 } } : null;
     }
-    const selection = getSelection();
-    if (!selection?.rangeCount || selection.isCollapsed) return null;
-    const text = selection.toString().trim();
-    if (!text) return null;
-    const rects = [...selection.getRangeAt(0).getClientRects()];
-    const rect = rects.find(rect => event.clientY >= rect.top && event.clientY <= rect.bottom) || rects.at(-1);
-    if (!rect) return null;
-    return { text, x: event.clientX || rect.left, top: rect.top, bottom: rect.bottom };
+    const selected = getSelection(); if (!selected?.rangeCount || selected.isCollapsed || !selected.toString().trim()) return null;
+    const r = selected.getRangeAt(0).getBoundingClientRect();
+    return { text: selected.toString().trim(), anchor: { left: event.clientX || r.left, right: r.right, top: r.top, bottom: r.bottom } };
   }
-  document.addEventListener('mouseup', event => {
-    if (event.button !== 0 || event.composedPath().includes(host)) return;
-    clearTimeout(pendingSelection);
-    const next = capture(event);
-    if (!next) { if (mode === 'button') hide(); return; }
-    hide();
-    snapshot = next;
-    focusBefore = document.activeElement;
-    const version = revision;
-    pendingSelection = setTimeout(async () => {
-      try {
-        const status = await send('STATUS');
-        if (version === revision && status.enabled) { snapshot.defaultLanguage = status.defaultLanguage; showButton(); }
-      } catch { if (version === revision) showButton(); }
-    }, 40);
+  A.listen(document, 'pointerdown', event => {
+    if (captureHidden || capture?.active || view?.contains(event) || event.composedPath().some(node => ['opentransai-entry', 'opentransai-capture'].includes(node?.id))) return;
+    const at = timestamp();
+    if (isTop) dismiss(at);
+    else void A.send('DISMISS_PANEL', { at }).catch(() => {});
+  }, { capture: true, passive: true });
+  A.listen(document, 'mouseup', event => {
+    if (event.button || capture?.active || event.composedPath().some(A.isExtensionNode)) return;
+    const selected = selection(event); if (selected) void entries.selection(selected).catch(() => {});
   });
-  // Preserve the page selection when pressing the trigger, but allow selecting the result.
-  shadow.addEventListener('mousedown', event => { if (event.target.closest('button')) event.preventDefault(); });
-  document.addEventListener('mousedown', event => {
-    if (!event.composedPath().includes(host)) hide();
-  }, true);
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && mode !== 'hidden') { hide(true); }
-  }, true);
-  document.addEventListener('scroll', event => {
-    if (event.composedPath().includes(host)) return;
-    if (mode === 'button') hide();
-  }, true);
-  window.addEventListener('resize', () => { if (mode === 'button') hide(); else position(); });
-  window.visualViewport?.addEventListener('resize', position);
-  window.visualViewport?.addEventListener('scroll', position);
-  // Error messages, source expansion and font reflow can also resize the card.
-  new ResizeObserver(position).observe(host);
-  window.addEventListener('pagehide', () => hide());
+  A.listen(document, 'keydown', event => {
+    if (event.key !== 'Escape' || capture?.active || captureHidden) return;
+    if (task) close();
+    else {
+      entries.hide();
+      if (!isTop) void A.send('CLOSE_PANEL', { at: timestamp() }).catch(() => {});
+    }
+  });
+  A.listen(window, 'pagehide', () => { capture?.cancel(); close(); });
+  const receive = (message, _sender, sendResponse) => {
+    if (!A.alive()) return;
+    const reply = value => { if (A.alive()) { try { sendResponse(value); } catch (error) { A.runtimeError(error); } } };
+    if (message.type === 'CAPTURE_VISIBILITY') { captureHidden = message.active; if (captureHidden) entries.hide(); reply({ ok: true }); return; }
+    if (message.type === 'HIDE_ENTRY') { entries.claim(message.owner); reply({ ok: true }); return; }
+    if (message.type === 'READ_IMAGE') { void entries.read(message.token, message.url).then(reply).catch(() => reply({ code: 'READ', error: '无法读取这张图片，请重试。' })); return true; }
+    if (message.type === 'CONTEXT_IMAGE') { void entries.context(message.url).then(() => reply({ ok: true })).catch(error => reply({ ok: false, code: error.code || 'SERVICE', error: error.message })); return true; }
+    if (!isTop) return;
+    if (message.type === 'ENTRY_ERROR') {
+      if (message.expectedUrl !== location.href) { reply({ ok: false }); return; }
+      captureIntent = null; capture?.cancel(); invalidate(); entries.hide();
+      const error = message.error;
+      task = { source: { kind: error.sourceKind }, kind: error.sourceKind, state: 'error', busy: false, translation: '', error: error.message, code: error.code, entryError: error, defaultLanguage: 'zh-CN' };
+      openedAt = timestamp(); view.open(task); reply({ ok: true }); return;
+    }
+    if (message.type === 'DISMISS_PANEL') { dismiss(message.at); reply({ ok: true }); }
+    if (message.type === 'CLOSE_PANEL') { dismiss(message.at, true); reply({ ok: true }); }
+    if (message.type === 'OPEN_SOURCE') { void openSource(message.source, message.anchor).catch(showError); reply({ ok: true }); }
+    if (message.type === 'BEGIN_CAPTURE') { void beginCapture(); reply({ ok: true }); }
+    if (message.type === 'CAPTURE_VERIFY') reply(capture.verify(message.nonce));
+    if (message.type === 'ACCESS_FINISHED') {
+      if (message.granted) { if (message.purpose === 'capture') { if (captureIntent && captureIntent === message.intent) void beginCapture(); } else if (task?.source.id === message.sourceId) void run({ reread: true }).catch(showError); }
+      reply({ ok: true });
+    }
+  };
+  try {
+    const messages = chrome.runtime.onMessage;
+    messages.addListener(receive);
+    A.onInvalidated(() => messages.removeListener(receive));
+  } catch (error) { A.runtimeError(error); }
 })();

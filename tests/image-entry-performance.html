@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OpenTransAI · 图片入口性能回归</title>
+<style>body{font:16px/1.6 system-ui;margin:24px;color:#243146}#photos{display:flex;gap:24px;align-items:start}#noise{position:fixed;left:-10000px;top:0}pre{white-space:pre-wrap}button{margin:20px 0;padding:8px 16px}</style></head>
+<body><h1>通用图片入口 · 页面响应回归</h1><p>真实 DOM、MutationObserver 与生产入口；后台状态使用模拟响应，不调用 AI。</p>
+<section id="photos"><img id="large" width="320" height="160" alt="普通图片"><img id="small" width="80" height="60" alt="小图片"></section>
+<aside id="noise"><div id="feed"></div></aside><button id="run">运行性能回归</button><pre id="results">等待测试</pre>
+<script type="module" src="/tests/image-entry-performance.js"></script></body></html>

@@ -1,13 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "OpenTransAI · 划词翻译",
+  "name": "OpenTransAI · AI 翻译",
   "version": "1.0.0",
-  "description": "选中文字，一键 AI 翻译。自动在默认语言和英语之间切换，使用你自己的 AI 服务与 Key。",
+  "description": "划词、图片和框选截图翻译，在统一浮窗中阅读。使用你自己的 AI 服务、视觉模型与 Key。",
   "minimum_chrome_version": "123",
   "permissions": [
-    "storage"
+    "storage",
+    "contextMenus",
+    "activeTab",
+    "scripting"
   ],
   "optional_host_permissions": [
+    "<all_urls>",
     "https://*/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
@@ -18,7 +22,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "OpenTransAI · 划词翻译",
+    "default_title": "OpenTransAI · AI 翻译",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/light/icon-16.png",
@@ -38,6 +42,11 @@
         "https://*/*"
       ],
       "js": [
+        "lib/page-shared.js",
+        "lib/image-format.js",
+        "lib/panel.js",
+        "lib/image-entry.js",
+        "lib/capture.js",
         "content.js"
       ],
       "run_at": "document_idle",

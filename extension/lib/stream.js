@@ -1,5 +1,7 @@
-export class TranslationError extends Error {}
-const fail = message => { throw new TranslationError(message); };
+export class TranslationError extends Error {
+  constructor(message, code = 'FORMAT') { super(message); this.name = 'TranslationError'; this.code = code; }
+}
+const fail = (message, code = 'FORMAT') => { throw new TranslationError(message, code); };
 
 // SSE records can cross TCP chunks, UTF-8 characters and CRLF boundaries.
 export async function readEvents(body, receive, signal, activity) {
@@ -19,7 +21,7 @@ export async function readEvents(body, receive, signal, activity) {
       if (signal.aborted) throw signal.reason;
       const { done, value } = await reader.read();
       if (signal.aborted) throw signal.reason;
-      if (value) { total += value.length; activity(); }
+      if (value) total += value.length;
       if (total > 8_000_000) fail('AI 返回内容过长，请缩小选区。');
       buffer += decoder.decode(value, { stream: !done });
       let match;
@@ -95,12 +97,12 @@ export async function streamResponse(response, provider, { signal, activity, pro
     if (wire === '[DONE]') { finished = true; return true; }
     let data;
     try { data = JSON.parse(wire); } catch { fail('AI 流式数据格式不正确，请重试。'); }
-    if (data.error || data.type === 'error') fail('AI 服务在生成过程中返回错误，请稍后重试。');
+    if (data.error || data.type === 'error') fail('AI 服务在生成过程中返回错误，请稍后重试。', 'SERVICE');
     let delta = '';
     if (provider === 'anthropic') {
       if (data.delta?.stop_reason === 'max_tokens') fail('译文被模型截断，请缩小选区后重试。');
       if (data.delta?.stop_reason && !['end_turn', 'stop_sequence'].includes(data.delta.stop_reason)) fail('AI 未能完成翻译，请更换模型或重试。');
-      if (data.type === 'content_block_start' && data.content_block?.type === 'text') delta = data.content_block.text || '';
+      if (data.type === 'content_block_start' && data.content_block?.type === 'text') delta = data.content_block.text ?? '';
       if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') delta = data.delta.text;
       if (data.type === 'message_stop') { finished = true; return true; }
     } else if (provider === 'gemini') {
@@ -108,18 +110,20 @@ export async function streamResponse(response, provider, { signal, activity, pro
       if (candidate?.finishReason === 'MAX_TOKENS') fail('译文被模型截断，请缩小选区后重试。');
       if (data.promptFeedback?.blockReason || (candidate?.finishReason && candidate.finishReason !== 'STOP')) fail('AI 未能翻译这段内容，请调整选区或更换模型。');
       if (candidate?.finishReason === 'STOP') finished = true;
-      delta = candidate?.content?.parts?.filter(part => !part.thought).map(part => part.text || '').join('') || '';
+      const parts = candidate?.content?.parts?.filter(part => !part?.thought && part?.text !== undefined);
+      if (parts?.some(part => typeof part.text !== 'string')) fail('AI 流式内容格式不正确。');
+      delta = parts?.map(part => part.text).join('') ?? '';
     } else {
       const choice = data.choices?.[0];
       if (choice?.finish_reason === 'length') fail('译文被模型截断，请缩小选区后重试。');
       if (choice?.finish_reason && choice.finish_reason !== 'stop') fail('AI 未能完成翻译，请更换模型或重试。');
       // Only expose the phase, never forward or store raw reasoning text.
       if (typeof choice?.delta?.reasoning_content === 'string' && choice.delta.reasoning_content.length) phase('thinking');
-      delta = choice?.delta?.content || '';
+      delta = choice?.delta?.content ?? '';
     }
     if (typeof delta !== 'string') fail('AI 流式内容格式不正确。');
     if (delta) {
-      phase('translating');
+      if (delta.trim()) { activity?.(); phase('translating'); }
       raw += delta;
       if (raw.length > 700000) fail('AI 返回内容过长，请缩小选区。');
       progress(raw);

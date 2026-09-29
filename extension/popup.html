@@ -14,8 +14,9 @@
     <header class="heading">
       <img class="mark" src="icons/ai-translate-light.svg" width="52" height="52" alt="">
       <div><h1>翻译设置</h1><p>连接你的 AI 翻译服务</p></div>
+      <a class="diagnostics-link" href="diagnostics.html" target="_blank" rel="noopener">诊断日志</a>
     </header>
-    <div class="toggle-row"><label for="enabled">划词翻译</label><input id="enabled" type="checkbox" class="toggle" role="switch" disabled></div>
+    <div class="toggle-row"><label for="enabled">翻译功能</label><input id="enabled" type="checkbox" class="toggle" role="switch" disabled></div>
     <form id="settings-form">
       <fieldset id="fields" disabled>
         <div class="field">
@@ -26,25 +27,25 @@
         </div>
         <div class="field">
           <label for="base-url">API 地址</label>
-          <input id="base-url" name="baseUrl" type="url" placeholder="https://api.example.com/v1" required autocomplete="off" spellcheck="false">
+          <input id="base-url" name="baseUrl" type="url" placeholder="https://api.example.com/v1" required autocomplete="off" spellcheck="false" maxlength="2048">
         </div>
         <div class="field">
           <div class="model-label-row"><label for="model">模型</label><label class="thinking-label" for="thinking">思考模式<input id="thinking" type="checkbox" class="toggle" role="switch" aria-describedby="thinking-hint"></label></div>
           <input id="model" name="model" placeholder="填写 API 服务商提供的模型 ID" required autocomplete="off" spellcheck="false" maxlength="200">
           <p id="thinking-hint" class="field-hint">思考开关目前支持 DeepSeek 官方接口</p>
+          <p class="field-hint">图片发送至此 API，由当前模型识别（需支持视觉）。连接测试仅验证文本翻译。</p>
         </div>
         <div class="field">
           <label for="api-key">API Key</label>
           <div class="secret"><input id="api-key" name="apiKey" type="password" placeholder="输入 API Key" required autocomplete="off" spellcheck="false" maxlength="2000"><button id="reveal" class="reveal" type="button" aria-controls="api-key" aria-pressed="false">显示</button></div>
         </div>
         <div class="field">
-          <label for="default-language">默认语言</label>
+          <div class="language-label-row"><label for="default-language">默认语言</label><span id="language-hint">默认翻译为此语言</span></div>
           <div class="select-wrap"><select id="default-language" name="defaultLanguage" aria-describedby="language-hint"></select></div>
-          <p id="language-hint">默认翻译为此语言</p>
         </div>
         <div class="actions"><button id="test" class="secondary" type="button">测试连接</button><button id="save" class="save" type="submit">保存配置</button></div>
       </fieldset>
-      <p id="notice" class="notice" role="status" aria-live="polite"></p>
+      <div class="feedback"><div class="feedback-copy"><p id="notice" class="notice" role="status" aria-live="polite"></p><div id="draft-state" hidden><span id="draft-notice" role="status"></span></div></div><button id="discard-draft" type="button" hidden>放弃修改</button></div>
     </form>
   </main>
   </div>

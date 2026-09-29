@@ -1,0 +1,7 @@
+.diagnostics-page{padding:28px 20px}.diagnostics-page main{max-width:900px;margin:auto}
+.diagnostics-page .actions{flex-wrap:wrap;margin-top:20px}.diagnostics-page #count{margin:20px 0 12px}
+.diagnostic-entry{border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;overflow-wrap:anywhere}
+.diagnostic-entry h2{font-size:15px;font-weight:550;margin:6px 0}.diagnostic-entry .meta{font-size:12px}
+.diagnostic-entry summary{cursor:pointer;color:var(--accent);margin-top:10px;font-size:13px}.diagnostic-entry pre{white-space:pre-wrap;font-size:12px;margin:10px 0 0}
+#manual-copy{margin-top:20px}#copy-text{width:100%;min-height:220px;padding:12px;font:12px/1.6 monospace;color:inherit;background:var(--control);border:1px solid var(--input);border-radius:8px;resize:vertical}
+@media(max-width:480px){.diagnostics-page{padding:18px 12px}.diagnostic-entry{padding:12px}}

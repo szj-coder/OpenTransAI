@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createService } from '../extension/lib/service.js';
 import { DEFAULT_SETTINGS } from '../extension/lib/core.js';
+import { webcrypto } from 'node:crypto';
+globalThis.crypto ||= webcrypto;
 
 const contentSender = { id: 'extension-id', tab: { id: 7 }, frameId: 0, url: 'https://example.com/' };
 const optionsSender = { id: 'extension-id', url: 'chrome-extension://extension-id/popup.html' };
@@ -15,7 +17,7 @@ function setup({ configured = true, allowed = true, enabled = true, fetchImpl, p
     storage: { local: {
       setAccessLevel: async level => { access = level; },
       get: async () => ({ settings: stored }),
-      set: async value => { stored = value.settings; },
+      set: async value => { if (Object.hasOwn(value, 'settings')) stored = value.settings; },
     } },
     permissions: { contains: permissionCheck || (async () => allowed) },
   };
@@ -164,7 +166,7 @@ test('翻译端口仅接受翻译一次，不能读取设置或替换 Key', asyn
   port.receive({ type: 'TRANSLATE', requestId: 'duplicate', text: 'hello' });
   await new Promise(resolve => setTimeout(resolve, 30));
   assert.equal(calls, 1);
-  assert.deepEqual(port.sent.map(item => item.type), ['PHASE', 'PHASE', 'PROGRESS', 'DONE']);
+  assert.deepEqual(port.sent.map(item => item.type), ['PHASE', 'ACTIVITY', 'PHASE', 'PROGRESS', 'DONE']);
   assert.deepEqual(port.sent.filter(item => item.type === 'PHASE').map(item => item.phase), ['waiting', 'translating']);
   assert(port.sent.every(item => item.requestId === 'stream'));
   assert(!JSON.stringify(port.sent).includes('private-key'));

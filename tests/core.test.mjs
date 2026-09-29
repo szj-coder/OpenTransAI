@@ -115,3 +115,56 @@ test('慢请求超时，主动取消与网络错误有可理解的提示', async
   await assert.rejects(translate('hello', config(), { fetchImpl, timeoutMs: 10 }), /超时/);
   await assert.rejects(translate('hello', config(), { fetchImpl: async () => { throw new TypeError('Failed to fetch'); } }), /网络|连接/);
 });
+
+test('显式图片目标语言及已知混合源语言不触发自动方向', async () => {
+  const options = { targetLanguage: 'ja', sourceLanguage: 'mul' };
+  const expected = { sourceLanguage: 'mul', targetLanguage: 'ja', translation: 'こんにちは' };
+  assert.deepEqual(parseTranslation(JSON.stringify(expected), 'zh-CN', options), expected);
+  assert.throws(() => parseTranslation(JSON.stringify({ ...expected, targetLanguage: 'zh-CN' }), 'zh-CN', options), /方向/);
+  assert.throws(() => buildRequest(config(), 'hello', { targetLanguage: 'made-up' }));
+  assert.throws(() => buildRequest(config(), 'hello', { sourceLanguage: 'bad language' }));
+  const req = buildRequest(config(), 'hello', options);
+  assert.match(req.body.messages[0].content, /ja/); assert.match(req.body.messages[0].content, /mul/);
+  assert.deepEqual(await translate('hello', config(), { ...options, fetchImpl: async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(expected) } }] })) }), expected);
+});
+
+test('已知源语言可独立使用并在提示中保留，完整返回发送活动通知', async () => {
+  const req = buildRequest(config(), 'hello', { sourceLanguage: 'mul' });
+  assert.match(req.body.messages[0].content, /known sourceLanguage is mul/);
+  const activities = [];
+  await translate('hello', config(), { onActivity: value => activities.push(value), fetchImpl: async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(result) } }] })) });
+  assert.deepEqual(activities, [undefined]);
+});
+test('翻译错误码区分认证、额度、服务、配置和长度', async () => {
+  for (const [status, code] of [[401, 'AUTH'], [403, 'AUTH'], [429, 'RATE_LIMIT'], [400, 'SERVICE'], [500, 'SERVICE']]) await assert.rejects(translate('hello', config(), { fetchImpl: async () => new Response('SECRET', { status }) }), error => error.code === code && !error.message.includes('SECRET'));
+  await assert.rejects(translate('hello', config({ apiKey: '' })), error => error.code === 'CONFIG');
+  await assert.rejects(translate('x'.repeat(12001), config()), error => error.code === 'LIMIT');
+});
+test('翻译取消或超时可以中断不响应 abort 的传输及完整响应体', async () => {
+  await assert.rejects(translate('hello', config(), { timeoutMs: 10, maxDurationMs: 20, fetchImpl: () => new Promise(() => {}) }), error => error.code === 'TIMEOUT');
+  await assert.rejects(translate('hello', config(), { timeoutMs: 10, maxDurationMs: 20, fetchImpl: async () => ({ ok: true, headers: new Headers(), json: () => new Promise(() => {}) }) }), error => error.code === 'TIMEOUT');
+});
+
+test('Anthropic 非流式翻译要求成功终止原因', async () => {
+  for (const stop_reason of ['refusal', 'tool_use', 'pause_turn', null]) await assert.rejects(translate('hello', config({ provider: 'anthropic' }), { fetchImpl: async () => new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(result) }], stop_reason })) }), error => error.code === 'FORMAT');
+});
+test('已知源语言支持完整 BCP47 扩展标记', () => {
+  const sourceLanguage = 'en-US-u-ca-gregory';
+  const expected = { ...result, sourceLanguage };
+  assert.doesNotThrow(() => buildRequest(config(), 'hello', { sourceLanguage, targetLanguage: 'zh-CN' }));
+  assert.deepEqual(parseTranslation(JSON.stringify(expected), 'zh-CN', { sourceLanguage, targetLanguage: 'zh-CN' }), expected);
+});
+
+for (const provider of ['openai', 'anthropic', 'gemini']) {
+  test(`${provider} 图片排版约束随翻译请求传递，划词不启用`, async () => {
+    const text = '# Report\n\n- Keep all values\n\n| Item | Count |\n| --- | --- |\n| A | 0 |';
+    const testSettings = config({ provider });
+    const prompt = request => provider === 'anthropic' ? request.body.system : provider === 'gemini' ? request.body.systemInstruction.parts[0].text : request.body.messages[0].content;
+    const content = request => provider === 'anthropic' ? request.body.messages[0].content : provider === 'gemini' ? request.body.contents[0].parts[0].text : request.body.messages[1].content;
+    const formatted = buildRequest(testSettings, text, { imageLayout: true, targetLanguage: 'zh-CN', sourceLanguage: 'en' });
+    assert.match(prompt(formatted), /Image layout rules/);
+    assert.match(prompt(formatted), /Never invent a header/);
+    assert.equal(JSON.parse(content(formatted)).text, text);
+    assert.doesNotMatch(prompt(buildRequest(testSettings, text, { targetLanguage: 'zh-CN' })), /Image layout rules/);
+  });
+}

@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OpenTransAI · 图片翻译验收</title>
+<style>body{font:16px/1.6 system-ui;margin:24px;color:#243146;background:#f6f8fc}main{max-width:1000px;margin:auto}h1{font-size:24px}button{padding:9px 14px;margin:4px}#samples{display:flex;gap:24px;flex-wrap:wrap;padding:24px;background:white}img{object-fit:contain}pre{white-space:pre-wrap;font-size:13px}#spacer{height:1000px}.note{color:#607085;font-size:13px}</style></head>
+<body><main><h1>图片翻译 · 交互验收</h1><p class="note">实际生产模块与模拟 Chrome / AI 边界；不调用真实模型，不保存 Key。</p>
+<p id="selection">Stay curious. Keep exploring.</p><div id="samples"></div><button id="run-tests">运行图片交互测试</button><button id="show-image">预览图片翻译</button><button id="show-same-language">预览同语言图片翻译</button><button id="show-formatted">预览结构化图片翻译</button><button id="run-layout">验证当前视口布局</button><pre id="layout-results"></pre><pre id="results">等待测试</pre><textarea id="editable" aria-label="文本输入测试" style="display:block">Select some text.</textarea><input id="password" type="password" aria-label="密码不翻译" value="fake-password"><div id="spacer"></div></main>
+<script type="module" src="/tests/image-browser-runner.js"></script></body></html>
