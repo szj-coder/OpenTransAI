@@ -32,6 +32,13 @@
     }
     return null;
   }
+  function attributionFor(body) {
+    // Quoted posts use a passive source-language row instead of a translation button.
+    let row = body.previousElementSibling;
+    while (row && owned(row)) row = row.previousElementSibling;
+    if (!row || ownerOf(row) !== ownerOf(body) || !row.querySelector('svg[aria-hidden="true"]') || row.querySelector(`${TEXT},time,button,[role="button"]`)) return null;
+    return [...row.querySelectorAll('span')].some(node => /^(?:翻译自|翻譯自|translated from)\s*\S/i.test(node.textContent.trim())) ? row : null;
+  }
   function identity(body) {
     const owner = ownerOf(body);
     return [...(owner?.querySelectorAll('a[href*="/status/"]') || [])].find(link => ownerOf(link) === owner)?.getAttribute('href') || '';
@@ -157,10 +164,11 @@
       const detected = nativeFor(record.body);
       const native = detected || (record.native?.isConnected && ownerOf(record.native) === record.owner ? record.native : null);
       record.native = native;
-      const parent = native?.parentElement;
+      const attribution = native ? null : attributionFor(record.body);
+      const parent = native?.parentElement || attribution;
       const compactRow = parent && !parent.contains(record.body) && parent.querySelectorAll('button,[role="button"]').length <= 3 && !parent.querySelector(`${TEXT},time`);
       if (record.row && (!compactRow || record.row.node !== parent)) restoreRow(record);
-      if (native) {
+      if (native || attribution) {
         // Keep X's translation button and settings gear together, ahead of our entry.
         const anchor = compactRow ? [...parent.children].findLast(node => !owned(node)) : native;
         if (anchor.nextElementSibling !== record.host) anchor.after(record.host);
@@ -175,8 +183,9 @@
         record.host.style.marginInlineStart = '0';
       }
       // X sets the actionable label color on nested spans, not on the gray button.
-      const reference = native || nativeReference;
+      const reference = native || attribution || nativeReference;
       copyTypography(record.host, reference ? textReference(reference) : record.body);
+      if (attribution) record.host.style.color = nativeReference ? getComputedStyle(textReference(nativeReference)).color : '#1d9bf0';
       if (!reference) {
         record.host.style.fontSize = '13px'; record.host.style.lineHeight = '16px'; record.host.style.fontWeight = '400'; record.host.style.color = '#1d9bf0';
       }

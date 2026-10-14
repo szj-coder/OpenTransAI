@@ -37,6 +37,15 @@ const entry = node => node.querySelector('[data-opentransai-x-entry]');
 const button = node => entry(node)?.shadowRoot.querySelector('button');
 const result = node => node.querySelector('[data-opentransai-x-result]');
 const body = node => node.querySelector('[data-testid=tweetText]');
+function attributedQuote() {
+  const quote = post({ quote: true, native: false, id: '901', text: 'Quoted text with its own translation row.' });
+  quote.removeAttribute('data-testid'); quote.setAttribute('role', 'link');
+  quote.style.cssText = 'border:1px solid #cfd9de;border-radius:12px;padding:12px;margin-top:12px;';
+  const content = document.createElement('div'), source = body(quote), row = document.createElement('div');
+  row.className = 'attribution'; row.dir = 'ltr'; row.style.cssText = 'font:13px/16px system-ui;color:rgb(83,100,113);';
+  row.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" style="width:14px;height:14px;margin-right:4px"><path d="M4 4h10M9 2v2M6 7c1 4 4 7 8 9M12 4c0 5-3 9-8 12M13 21l4-11 4 11M15 17h4" fill="none" stroke="currentColor"/></svg><span>翻译自 英语</span>';
+  source.replaceWith(content); content.append(row, source); return quote;
+}
 async function reset(nodes = [post()]) {
   instance?.dispose(); status = { enabled: true, configured: true, defaultLanguage: 'zh-CN', configRevision: 'one' };
   posts.replaceChildren(...nodes); ports.length = 0; messages.length = 0;
@@ -172,6 +181,33 @@ test('真实 X 的 aria-label 控件与内部文字样式、role link 引用帖�
   await reset([a]);
   check(getComputedStyle(button(a)).color === 'rgb(29, 155, 240)' && getComputedStyle(button(a)).lineHeight === '16px', '没有继承实际可见按钮文字的样式');
   button(quote).click(); await delay(60); check(ports.length === 1 && ports[0].request.text === 'Real quote shape', '真实引用帖边界未识别');
+});
+test('引用帖只有翻译来源提示时入口同行，切换译文和缓存后保持位置且不影响外层', async () => {
+  const outer = post(), quote = attributedQuote(), row = quote.querySelector('.attribution'); outer.append(quote);
+  quote.style.width = '240px'; await reset([outer]);
+  const aligned = () => {
+    check(entry(quote).parentElement === row && row.lastElementChild === entry(quote), '引用帖入口没有放进原生翻译提示行');
+    const label = row.querySelector('span').getBoundingClientRect(), own = button(quote).getBoundingClientRect();
+    check(own.left >= label.right && Math.abs(own.top - label.top) < 1 && Math.abs(own.height - label.height) < 1, '引用帖入口换行或字号高度不一致');
+    check(getComputedStyle(button(quote)).color === 'rgb(29, 155, 240)', '入口沿用了提示文字的灰色');
+    check(outer.querySelector('[aria-label="翻译设置"]').nextElementSibling === entry(outer), '引用帖入口改变了外层按钮顺序');
+  };
+  aligned(); let opened = 0; quote.addEventListener('click', () => opened++);
+  button(quote).click(); await delay(60); aligned(); ports[0].done('引用帖译文'); await delay(60); aligned();
+  check(result(quote)?.textContent === '引用帖译文' && !body(outer).hidden && opened === 0, '引用帖译文串帖或按钮误打开详情');
+  button(quote).click(); await delay(60); aligned(); button(quote).click(); await delay(60); aligned();
+  check(ports.length === 1 && result(quote), '引用帖缓存切换失败');
+  instance.dispose(); check(!quote.querySelector('[data-opentransai-x-entry]') && !row.style.display && !body(quote).hidden, '卸载后残留翻译行布局或隐藏的正文');
+});
+test('引用帖翻译来源行动态出现或重建会跟随，正文中的相同文案不作为翻译行', async () => {
+  const quote = attributedQuote(), row = quote.querySelector('.attribution'); row.remove();
+  body(quote).textContent = '翻译自 英语：这是帖子正文'; await reset([quote]);
+  check(entry(quote).nextElementSibling === body(quote), '正文文字被误认为翻译来源提示');
+  body(quote).before(row); await delay(100); check(row.lastElementChild === entry(quote), '新增来源提示后没有迁移入口');
+  const replacement = row.cloneNode(true); replacement.querySelector('[data-opentransai-x-entry]')?.remove();
+  replacement.querySelector('span').textContent = 'Translated from English'; row.replaceWith(replacement); await delay(100);
+  check(replacement.lastElementChild === entry(quote) && quote.querySelectorAll('[data-opentransai-x-entry]').length === 1, '重建来源提示后缺少入口或重复挂载');
+  replacement.remove(); await delay(100); check(entry(quote).nextElementSibling === body(quote), '来源提示移除后入口丢失');
 });
 test('原生按钮与正文同一容器时仍在原生按钮之后，动态加入原生控件后迁移入口', async () => {
   const a = post({ native: false }), control = document.createElement('button'); control.textContent = '显示翻译';
