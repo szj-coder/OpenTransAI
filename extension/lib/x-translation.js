@@ -5,12 +5,21 @@
   const HOSTS = ['x.com', 'www.x.com', 'mobile.x.com', 'twitter.com', 'www.twitter.com', 'mobile.twitter.com'];
   const TEXT = '[data-testid="tweetText"]';
   const OWNER = 'article[data-testid="tweet"], [data-testid="quoteTweet"], [role="link"]';
-  const OWN = '[data-opentransai-x-entry], [data-opentransai-x-result]';
+  const OWN = '[data-opentransai-x-entry], [data-opentransai-x-result], [data-opentransai-x-style]';
   const originalLabel = /^(显示原文|查看原文|顯示原文|檢視原文|show original|原文を表示|原文を見る|원문 보기|mostrar original|voir l[’']original|afficher l[’']original|original anzeigen|mostrar original|mostra originale|показать оригинал)$/i;
   const translateLabel = /^(显示翻译|查看翻译|翻译帖子|翻译推文|翻譯貼文|顯示翻譯|show translation|translate (?:post|tweet)|翻訳を表示|ポストを翻訳|ツイートを翻訳|번역 보기|게시물 번역|traducir (?:post|publicación)|mostrar traducción|voir la traduction|traduire le post|übersetzung anzeigen|post übersetzen|mostrar tradução|traduzir post|mostra traduzione|показать перевод)$/i;
   const ownerOf = node => node?.parentElement?.closest(OWNER);
   const owned = node => (node?.nodeType === 1 ? node : node?.parentElement)?.closest(OWN);
-  const label = node => (node?.getAttribute('aria-label') || node?.textContent || '').trim();
+  const label = node => {
+    const labels = [node?.getAttribute('aria-label'), node?.textContent].filter(Boolean).map(text => text.trim());
+    return labels.find(text => originalLabel.test(text) || translateLabel.test(text)) || labels[0] || '';
+  };
+  const textReference = node => [...node.querySelectorAll('*')].findLast(child => child.textContent.trim() && child.textContent.trim() === node.textContent.trim()) || node;
+  const typography = ['font-family', 'font-size', 'font-weight', 'font-style', 'font-stretch', 'font-variant', 'line-height', 'letter-spacing', 'text-transform', 'color'];
+  const copyTypography = (target, source) => {
+    const computed = getComputedStyle(source);
+    for (const name of typography) target.style.setProperty(name, computed.getPropertyValue(name));
+  };
   const nativeAction = node => node && !owned(node) && (originalLabel.test(label(node)) || translateLabel.test(label(node)) || node.getAttribute('data-testid') === 'translateTweet');
   function nativeFor(body) {
     const owner = ownerOf(body);
@@ -44,12 +53,15 @@
   });
   A.createXTranslation = () => {
     if (instance || !A.alive()) return instance;
-    let disposed = false, status = null, statusVersion = 0, timer = null, url = location.href;
+    let disposed = false, status = null, statusVersion = 0, timer = null, nativeReference = null, url = location.href;
     const records = new Map(), cache = new Map(), roots = new Set();
+    const linkStyle = document.createElement('style'); linkStyle.dataset.opentransaiXStyle = '';
+    linkStyle.textContent = '[data-opentransai-x-result] a[data-opentransai-x-mention]:hover,[data-opentransai-x-result] a[data-opentransai-x-mention]:focus-visible{text-decoration:underline!important}';
+    (document.head || document.documentElement).append(linkStyle);
     const remember = (key, value) => { cache.delete(key); cache.set(key, value); if (cache.size > 100) cache.delete(cache.keys().next().value); };
     const alive = record => !disposed && A.alive() && records.get(record.body) === record && record.owner.isConnected && identity(record.body) === record.identity;
     function restore(record) {
-      record.result?.remove(); record.result = null;
+      record.result?.remove(); record.result = null; record.mentionLinks = [];
       if (record.savedDisplay) {
         const { value, priority, hidden } = record.savedDisplay;
         if (record.body.style.getPropertyValue('display') === 'none' && record.body.style.getPropertyPriority('display') === 'important') {
@@ -66,9 +78,7 @@
       const requestId = record.requestId; record.requestId = null;
       if (requestId && A.alive()) void A.send('CANCEL', { scope: 'x-post', taskId: record.taskId, requestId }).catch(() => {});
     }
-    function remove(record) {
-      cancel(record); restore(record); record.host.remove();
-      record.owner.removeEventListener('click', record.onNative, true);
+    function restoreRow(record) {
       if (record.row) {
         for (const [name, value, priority] of record.row.saved) {
           // Only restore properties still carrying the value installed by us.
@@ -76,7 +86,13 @@
             if (value) record.row.node.style.setProperty(name, value, priority); else record.row.node.style.removeProperty(name);
           }
         }
+        record.row = null;
       }
+    }
+    function remove(record) {
+      cancel(record); restore(record); record.host.remove();
+      record.owner.removeEventListener('click', record.onNative, true);
+      restoreRow(record);
       records.delete(record.body);
     }
     function render(record) {
@@ -97,13 +113,35 @@
       record.needsSettings = E.errorRecovery(safe.code, 'text').settings;
       render(record);
     }
+    function appendTranslation(record, result, translation) {
+      const mentions = new Map();
+      for (const source of record.body.querySelectorAll('a[href]')) {
+        const handle = source.textContent.trim();
+        if (!/^@[A-Za-z0-9_]{1,15}$/.test(handle)) continue;
+        try {
+          const url = new URL(source.href);
+          if (url.protocol === 'https:' && HOSTS.includes(url.hostname) && url.pathname.replace(/\/$/, '').toLowerCase() === '/' + handle.slice(1).toLowerCase()) mentions.set(handle.toLowerCase(), source);
+        } catch { /* Only reuse actual X profile links found in this body. */ }
+      }
+      let offset = 0;
+      for (const match of translation.matchAll(/@[A-Za-z0-9_]+/g)) {
+        const source = mentions.get(match[0].toLowerCase());
+        if (!source || /[A-Za-z0-9_@]/.test(translation[match.index - 1] || '')) continue;
+        result.append(document.createTextNode(translation.slice(offset, match.index)));
+        const link = document.createElement('a'); link.dataset.opentransaiXMention = ''; link.href = source.href;
+        link.textContent = match[0]; link.dir = source.dir || 'auto';
+        if (source.target === '_blank') { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
+        copyTypography(link, textReference(source)); link.style.textDecoration = 'none'; link.style.cursor = 'pointer';
+        result.append(link); record.mentionLinks.push({ link, source }); offset = match.index + match[0].length;
+      }
+      result.append(document.createTextNode(translation.slice(offset)));
+    }
     function show(record, translation) {
       restore(record);
       const result = document.createElement('div'); result.id = `opentransai-x-result-${record.taskId}`; result.dataset.opentransaiXResult = '';
-      const style = getComputedStyle(record.body);
       result.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;';
-      for (const name of ['font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'color']) result.style.setProperty(name, style.getPropertyValue(name));
-      result.dir = 'auto'; result.setAttribute('role', 'status'); result.textContent = translation;
+      copyTypography(result, record.body);
+      result.dir = 'auto'; result.setAttribute('role', 'status'); appendTranslation(record, result, translation);
       result.addEventListener('click', event => event.stopPropagation());
       record.body.after(result); record.result = result;
       record.savedDisplay = { value: record.body.style.getPropertyValue('display'), priority: record.body.style.getPropertyPriority('display'), hidden: record.body.hidden };
@@ -113,9 +151,10 @@
     function place(record) {
       const native = nativeFor(record.body), parent = native?.parentElement;
       const compactRow = parent && !parent.contains(record.body) && parent.querySelectorAll('button,[role="button"]').length <= 3 && !parent.querySelector(`${TEXT},time`);
-      if (compactRow) {
-        if (record.host.parentElement !== parent) parent.append(record.host);
-        if (!record.row || record.row.node !== parent) {
+      if (record.row && (!compactRow || record.row.node !== parent)) restoreRow(record);
+      if (native) {
+        if (native.nextElementSibling !== record.host) native.after(record.host);
+        if (compactRow && !record.row) {
           const applied = { display: 'flex', 'flex-direction': 'row', 'flex-wrap': 'wrap', 'align-items': 'center' };
           record.row = { node: parent, applied, saved: Object.keys(applied).map(name => [name, parent.style.getPropertyValue(name), parent.style.getPropertyPriority(name)]) };
           for (const [name, value] of Object.entries(applied)) parent.style.setProperty(name, value);
@@ -126,13 +165,15 @@
         record.host.style.marginInlineStart = '0';
       }
       // X sets the actionable label color on nested spans, not on the gray button.
-      const reference = native ? [...native.querySelectorAll('span')].filter(node => node.textContent.trim() === label(native)).at(-1) || native : record.body;
-      const computed = getComputedStyle(reference);
-      record.host.style.fontFamily = computed.fontFamily;
-      record.host.style.fontSize = native ? computed.fontSize : '13px';
-      record.host.style.lineHeight = native ? computed.lineHeight : '20px';
-      record.host.style.color = native ? computed.color : '#1d9bf0';
-      if (record.result) record.result.style.color = getComputedStyle(record.body).color;
+      const reference = native || nativeReference;
+      copyTypography(record.host, reference ? textReference(reference) : record.body);
+      if (!reference) {
+        record.host.style.fontSize = '13px'; record.host.style.lineHeight = '16px'; record.host.style.fontWeight = '400'; record.host.style.color = '#1d9bf0';
+      }
+      if (record.result) {
+        copyTypography(record.result, record.body);
+        for (const { link, source } of record.mentionLinks) copyTypography(link, textReference(source));
+      }
     }
     async function original(record, version) {
       let native = nativeFor(record.body);
@@ -213,7 +254,7 @@
       const taskId = A.uid(), host = document.createElement('span'); host.id = `opentransai-x-entry-${taskId}`; host.dataset.opentransaiXEntry = '';
       host.style.cssText = 'display:inline-flex;vertical-align:baseline;max-width:100%;';
       const shadow = host.attachShadow({ mode: 'open' }), style = document.createElement('style');
-      style.textContent = ':host{font-weight:400}*{box-sizing:border-box}span{display:inline-flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap;max-width:100%;font:inherit;color:inherit}button{font:inherit;line-height:inherit;color:inherit;background:transparent;border:0;padding:0;margin:0;cursor:pointer;text-align:start}button:hover{text-decoration:underline}button:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:2px}button:disabled{cursor:wait;opacity:.65;text-decoration:none}[hidden]{display:none!important}.notice{color:inherit;opacity:.8;font-size:12px}';
+      style.textContent = '*{box-sizing:border-box}span{display:inline-flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap;max-width:100%;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit}button{font:inherit;line-height:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;background:transparent;border:0;padding:0;margin:0;cursor:pointer;text-align:start}button:hover{text-decoration:underline}button:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:2px}button:disabled{cursor:wait;opacity:.65;text-decoration:none}[hidden]{display:none!important}.notice{color:inherit;opacity:.8;font-size:12px}';
       const line = document.createElement('span'), button = document.createElement('button'), notice = document.createElement('span'), settings = document.createElement('button');
       button.type = settings.type = 'button'; notice.className = 'notice'; notice.setAttribute('role', 'status'); settings.textContent = '打开设置'; settings.hidden = true;
       line.append(button, notice, settings); shadow.append(style, line);
@@ -230,6 +271,7 @@
     function reconcile() {
       timer = null;
       if (disposed || !A.alive()) return;
+      nativeReference = [...document.querySelectorAll('button,[role="button"]')].find(node => ownerOf(node) && nativeAction(node)) || null;
       if (location.href !== url) { url = location.href; for (const record of [...records.values()]) remove(record); roots.add(document); }
       for (const record of [...records.values()]) {
         if (record.acquiring && record.owner.isConnected) continue;
@@ -285,6 +327,7 @@
       if (disposed) return; disposed = true; statusVersion++;
       observer.disconnect(); themeObserver.disconnect(); clearTimeout(timer);
       for (const record of [...records.values()]) remove(record);
+      linkStyle.remove();
       cache.clear(); roots.clear();
       try { chrome.runtime.onMessage.removeListener(receive); } catch { /* Runtime may already be gone. */ }
       window.removeEventListener('focus', focus); window.removeEventListener('popstate', navigate); window.removeEventListener('pagehide', pagehide);

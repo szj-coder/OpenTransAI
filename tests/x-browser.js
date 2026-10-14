@@ -47,7 +47,7 @@ const test = (name, fn) => tests.push({ name, fn });
 test('所有文字帖子都有入口，原生控件后同排追加，无控件时在正文上方', async () => {
   const [a, b] = await reset([post(), post({ id: '101', native: false })]);
   check(button(a) && button(b), '文字帖子缺少 OpenTransAI 入口');
-  check(entry(a).parentElement === a.querySelector('.controls') && entry(a).previousElementSibling?.textContent === '⚙', '入口未在原生控件组之后');
+  check(entry(a).previousElementSibling === a.querySelector('[data-testid=translateTweet]') && entry(a).nextElementSibling?.textContent === '⚙', '入口没有紧跟原生翻译按钮');
   check(entry(b).nextElementSibling === body(b), '无原生控件入口未在正文上方');
 });
 test('点击等待保留原文，验证完成后切换，再点恢复完整原节点和缓存', async () => {
@@ -172,9 +172,49 @@ test('真实 X 的 aria-label 控件与内部文字样式、role link 引用帖�
   check(getComputedStyle(button(a)).color === 'rgb(29, 155, 240)' && getComputedStyle(button(a)).lineHeight === '16px', '没有继承实际可见按钮文字的样式');
   button(quote).click(); await delay(60); check(ports.length === 1 && ports[0].request.text === 'Real quote shape', '真实引用帖边界未识别');
 });
+test('原生按钮与正文同一容器时仍在原生按钮之后，动态加入原生控件后迁移入口', async () => {
+  const a = post({ native: false }), control = document.createElement('button'); control.textContent = '显示翻译';
+  await reset([a]); a.append(control); await delay(100);
+  check(control.nextElementSibling === entry(a), '原生按钮在正文后时入口仍留在正文上方');
+  check(a.querySelectorAll('[data-opentransai-x-entry]').length === 1, '移动入口产生重复按钮');
+});
+test('按钮同步原生文字的完整字体和行高，保持同排对齐', async () => {
+  const a = post(), control = a.querySelector('[data-testid=translateTweet]');
+  control.removeAttribute('data-testid'); control.setAttribute('aria-label', '翻译这个帖子');
+  control.style.cssText = 'color:rgb(83,100,113);font:12px/normal serif;display:inline-flex;align-items:center';
+  control.innerHTML = '<span style="font:500 15px/20px system-ui;letter-spacing:.25px;color:rgb(29,155,240)">显示翻译</span>';
+  const b = post({ id: '800', native: false }); await reset([a,b]);
+  const expected = getComputedStyle(control.firstElementChild), actual = getComputedStyle(button(a));
+  for (const name of ['fontFamily','fontSize','fontWeight','fontStyle','lineHeight','letterSpacing','color']) check(actual[name] === expected[name], '文字样式不一致: ' + name);
+  const rect = control.getBoundingClientRect(), own = button(a).getBoundingClientRect();
+  check(own.left >= rect.right && Math.abs(own.top - rect.top) < 1 && Math.abs(own.height - rect.height) < 1, '按钮不在同一排或高度不一致');
+  check(getComputedStyle(button(b)).fontSize === '15px' && getComputedStyle(button(b)).lineHeight === '20px', '没有原生控件的帖子未沿用页面原生字号');
+});
+test('译文保留已有关联用户的蓝色链接，标点、重复提及与纯文本安全不受影响', async () => {
+  const a = post({ native: false });
+  body(a).innerHTML = 'Thanks <a href="https://x.com/OpenAI" style="color:rgb(29,155,240);text-decoration:none"><span>@OpenAI</span></a>. Also <a href="https://x.com/sama">@sama</a>.';
+  const source = body(a).querySelector('a'); let sourceClicks = 0, postClicks = 0;
+  source.addEventListener('click', e => { e.preventDefault(); sourceClicks++; }); a.addEventListener('click', () => postClicks++);
+  await reset([a]); button(a).click(); await delay(50);
+  const translated = '谢谢 @OpenAI. 和 @sama；再次 @OpenAI！未知 @nobody、邮箱 mail@OpenAI。<script>literal</script>';
+  ports[0].done(translated); await delay(50);
+  const links = [...result(a).querySelectorAll('a')];
+  check(links.length === 3 && links[0].href === 'https://x.com/OpenAI' && links[1].href === 'https://x.com/sama', '关联用户丢失或错误链接了未知账号/邮箱');
+  check(getComputedStyle(links[0]).color === 'rgb(29, 155, 240)' && getComputedStyle(links[0]).textDecorationLine === 'none', '提及链接丢失原有蓝色或默认样式');
+  check(result(a).textContent === translated && !result(a).querySelector('script'), '标点文本被改动或插入了模型 HTML');
+  links[0].addEventListener('click', e => e.preventDefault()); links[0].click(); check(postClicks === 0, '链接点击冒泡打开了帖子详情');
+  button(a).click(); source.click(); check(sourceClicks === 1 && body(a).querySelector('a') === source, '恢复原文丢失原始链接节点或事件');
+  button(a).click(); await delay(50); check(ports.length === 1 && result(a).querySelectorAll('a').length === 3, '缓存译文丢失提及链接');
+});
+test('译文不会把外部同名链接或引用帖提及当作当前帖的用户链接', async () => {
+  const a = post({ native: false }), quote = post({ native: false, quote: true, id: '810' });
+  body(a).innerHTML = '<a href="https://example.com/OpenAI">@OpenAI</a>'; body(quote).innerHTML = '<a href="https://x.com/sama">@sama</a>'; a.append(quote);
+  await reset([a]); button(a).click(); await delay(50); ports[0].done('@OpenAI @sama'); await delay(50);
+  check(result(a).querySelectorAll('a').length === 0, '创建了非源文用户链接或混入了引用帖链接');
+});
 test('卸载恢复正文并清理全部 UI，扩展失效后不再发请求', async () => {
   const [a] = await reset(); button(a).click(); await delay(40); ports[0].done(); await delay(40); instance.dispose();
-  check(!body(a).hidden && !entry(a) && !result(a), '卸载残留界面');
+  check(!body(a).hidden && !entry(a) && !result(a) && !document.querySelector('[data-opentransai-x-style]'), '卸载残留界面或链接样式');
   await reset(); delete api.runtime.id; button(posts.firstElementChild).click(); await delay(60);
   check(!entry(posts.firstElementChild) && ports.length === 0, '失效后仍挂载入口或发送请求'); api.runtime.id = 'x-fixture';
 });
@@ -184,8 +224,12 @@ document.querySelector('#run').addEventListener('click', async () => {
   output.textContent += `${passed}/${tests.length} passed; uncaught errors: ${errors.length}`; output.dataset.complete = 'true';
 });
 document.querySelector('#preview').addEventListener('click', async () => {
-  const [a] = await reset([post({ text: 'Wechatの中国人の友達\n今6人 !!!!!!!!' }), post({ native: false, text: 'Good design makes everyday things feel simple.' })]);
-  button(a)?.click(); await delay(60); ports.at(-1)?.done('微信上的中国朋友\n现在有 6 个人了！！！！！！');
+  const a = post({ text: 'A thoughtful update from @OpenAI. Thanks @sama!' });
+  body(a).innerHTML = 'A thoughtful update from <a href="https://x.com/OpenAI">@OpenAI</a>. Thanks <a href="https://x.com/sama">@sama</a>!';
+  a.querySelector('.controls').style.cssText = 'font:13px/16px system-ui;';
+  await reset([a, post({ id: '101', native: false, text: 'Good design makes everyday things feel simple.' })]);
+  button(a)?.click(); await delay(60); ports.at(-1)?.done('来自 @OpenAI 的用心更新。谢谢 @sama！');
+  output.textContent = '交互示例 · 模拟译文';
 });
 document.querySelector('#theme').addEventListener('click', () => document.documentElement.classList.toggle('dark'));
 await reset();
