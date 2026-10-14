@@ -96,7 +96,9 @@
       records.delete(record.body);
     }
     function render(record) {
-      record.button.textContent = record.busy ? 'OpenTransAI 翻译中…' : record.result ? 'OpenTransAI · 显示原文' : record.error ? 'OpenTransAI · 重试翻译' : '使用 OpenTransAI 翻译';
+      record.button.textContent = record.busy ? '翻译中…' : record.result ? '显示原文' : record.error ? '重试翻译' : 'AI 翻译';
+      record.button.title = `OpenTransAI · ${record.button.textContent}`;
+      record.button.setAttribute('aria-label', record.button.title);
       record.button.disabled = record.busy;
       record.button.setAttribute('aria-busy', String(record.busy));
       record.button.setAttribute('aria-pressed', String(Boolean(record.result)));
