@@ -178,6 +178,34 @@ test('原生按钮与正文同一容器时仍在原生按钮之后，动态加�
   check(control.nextElementSibling === entry(a), '原生按钮在正文后时入口仍留在正文上方');
   check(a.querySelectorAll('[data-opentransai-x-entry]').length === 1, '移动入口产生重复按钮');
 });
+test('译文完成后的控件重排会归位，恢复原文及缓存切换保持原生按钮在前', async () => {
+  const [a] = await reset(), native = a.querySelector('[data-testid=translateTweet]');
+  const ordered = () => {
+    check(native.nextElementSibling === entry(a), '入口跑到原生翻译按钮之前');
+    const first = native.getBoundingClientRect(), second = button(a).getBoundingClientRect();
+    check(second.left >= first.right && Math.abs(second.top - first.top) < 1, '按钮可见顺序或同行位置错误');
+  };
+  button(a).click(); await delay(60); ordered();
+  ports[0].done(); await delay(60);
+  // A page update may move the extension-owned sibling while retaining X's controls.
+  native.before(entry(a)); await delay(100);
+  check(result(a), '控件重排丢失了译文'); ordered();
+  native.before(entry(a)); button(a).click();
+  check(!body(a).hidden, '未恢复原文'); ordered();
+  button(a).click(); await delay(60); check(result(a) && ports.length === 1, '未复用缓存译文'); ordered();
+});
+test('原生控件暂时重绘标签及重建后补充 aria-label，译文入口仍跟随原生控件', async () => {
+  const a = post(), native = a.querySelector('[data-testid=translateTweet]'); native.removeAttribute('data-testid');
+  await reset([a]); button(a).click(); await delay(60); ports[0].done(); await delay(60);
+  native.textContent = ''; await delay(100);
+  check(native.nextElementSibling === entry(a), '原生控件标签重绘期间入口退回正文上方');
+  native.setAttribute('aria-label', '显示翻译'); await delay(100);
+  const row = document.createElement('div'), replacement = document.createElement('button'); row.className = 'controls'; row.append(replacement);
+  native.parentElement.replaceWith(row); await delay(100);
+  replacement.setAttribute('aria-label', '显示翻译'); await delay(100);
+  check(replacement.nextElementSibling === entry(a), '新原生控件更新可访问标签后入口未归位');
+  check(a.querySelectorAll('[data-opentransai-x-entry]').length === 1 && result(a), '重建控件导致重复入口或丢失译文');
+});
 test('按钮同步原生文字的完整字体和行高，保持同排对齐', async () => {
   const a = post(), control = a.querySelector('[data-testid=translateTweet]');
   control.removeAttribute('data-testid'); control.setAttribute('aria-label', '翻译这个帖子');

@@ -105,6 +105,7 @@
       record.notice.textContent = record.error || '';
       record.settings.hidden = !record.needsSettings;
       record.host.hidden = !status?.enabled;
+      place(record);
     }
     function fail(record, error) {
       if (!alive(record)) return;
@@ -151,7 +152,12 @@
       render(record);
     }
     function place(record) {
-      const native = nativeFor(record.body), parent = native?.parentElement;
+      // X may briefly clear a control's label while updating it. Keep the known
+      // control as the anchor until it leaves this post instead of jumping above it.
+      const detected = nativeFor(record.body);
+      const native = detected || (record.native?.isConnected && ownerOf(record.native) === record.owner ? record.native : null);
+      record.native = native;
+      const parent = native?.parentElement;
       const compactRow = parent && !parent.contains(record.body) && parent.querySelectorAll('button,[role="button"]').length <= 3 && !parent.querySelector(`${TEXT},time`);
       if (record.row && (!compactRow || record.row.node !== parent)) restoreRow(record);
       if (native) {
@@ -268,7 +274,7 @@
         const target = event.target?.closest?.('button,[role="button"]');
         if (!record.acquiring && target && target === nativeFor(record.body)) { cancel(record); restore(record); record.error = ''; record.needsSettings = false; render(record); }
       };
-      owner.addEventListener('click', record.onNative, true); records.set(body, record); place(record); render(record);
+      owner.addEventListener('click', record.onNative, true); records.set(body, record); render(record);
     }
     function reconcile() {
       timer = null;
@@ -312,11 +318,15 @@
     const observer = new MutationObserver(changes => {
       for (const change of changes) {
         if (owned(change.target)) continue;
-        if (change.type === 'childList' && [...change.addedNodes, ...change.removedNodes].every(node => owned(node))) continue;
+        if (change.type === 'childList') {
+          const nodes = [...change.addedNodes, ...change.removedNodes];
+          // Ignore our result rendering, but repair entry moves/removals by X.
+          if (nodes.every(node => owned(node)) && !nodes.some(node => node.nodeType === 1 && node.matches('[data-opentransai-x-entry]'))) continue;
+        }
         schedule(change.target.nodeType === 1 ? change.target : change.target.parentElement);
       }
     });
-    observer.observe(document, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['lang', 'href', 'data-testid'] });
+    observer.observe(document, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['lang', 'href', 'data-testid', 'aria-label'] });
     const themeObserver = new MutationObserver(() => schedule());
     for (const node of [document.documentElement, document.body]) if (node) themeObserver.observe(node, { attributes: true, attributeFilter: ['class', 'style', 'data-theme'] });
     const receive = message => { if (!disposed && A.alive() && message.type === 'STATUS_CHANGED') { statusVersion++; applyStatus(message.data); } };
