@@ -7,7 +7,10 @@ export function createService(api, { fetchImpl = globalThis.fetch } = {}) {
   const ready = api.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
   const diagnostics = createDiagnostics(api.storage.local, { ready });
   const entryErrors = createEntryErrors(api, diagnostics);
-  const active = new Map();
+  const active = new Map(), xTabs = new Set();
+  const isXSender = sender => {
+    try { const url = new URL(sender.url); return Number.isSafeInteger(sender.tab?.id) && url.protocol === 'https:' && ['x.com', 'www.x.com', 'mobile.x.com', 'twitter.com', 'www.twitter.com', 'mobile.twitter.com'].includes(url.hostname); } catch { return false; }
+  };
   let configRevision = 'legacy';
   const read = async () => {
     const values = await api.storage.local.get(['settings', 'configurationRevision']);
@@ -34,6 +37,7 @@ export function createService(api, { fetchImpl = globalThis.fetch } = {}) {
       const revision = revise ? crypto.randomUUID() : configRevision;
       await api.storage.local.set({ settings, configurationRevision: revision });
       configRevision = revision;
+      await Promise.all([...xTabs].map(tabId => api.tabs.sendMessage(tabId, { type: 'STATUS_CHANGED', data: publicStatus(settings) }, { frameId: 0 }).catch(() => { xTabs.delete(tabId); })));
       // Revision checking also prevents stale restoration if cleanup fails.
       if (revise && api.storage.session) await api.storage.session.remove('settingsDraft').catch(() => {});
       return settings;
@@ -52,14 +56,20 @@ export function createService(api, { fetchImpl = globalThis.fetch } = {}) {
     configRevision,
   });
 
-  const channelFor = sender => `${sender.tab?.id ?? sender.url}`;
+  const channelFor = (sender, message = {}) => {
+    const channel = `${sender.tab?.id ?? sender.url}`;
+    if (message.scope === undefined) return channel;
+    if (message.scope !== 'x-post' || !isXSender(sender) || !['TRANSLATE', 'CANCEL'].includes(message.type) ||
+        typeof message.taskId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(message.taskId)) throw Object.assign(new Error('无效的帖子翻译任务。'), { code: 'FORMAT' });
+    return `${channel}:x:${sender.frameId || 0}:${message.taskId}`;
+  };
   async function runOperation(message, sender, operation, externalSignal) {
     if (typeof message.requestId !== 'string' || !message.requestId || message.requestId.length > 100) throw new Error('无效请求编号。');
-    const channel = channelFor(sender);
+    const channel = channelFor(sender, message);
     active.get(channel)?.controller.abort();
-    if (!active.has(channel) && active.size >= 5) throw new Error('同时进行的翻译较多，请稍后重试。');
+    if (!active.has(channel) && active.size >= 5) throw Object.assign(new Error('同时进行的翻译较多，请稍后重试。'), { code: 'RATE_LIMIT' });
     const controller = new AbortController();
-    const entry = { id: message.requestId, controller };
+    const entry = { id: message.requestId, controller, tabId: sender.tab?.id };
     active.set(channel, entry);
     const abort = () => controller.abort();
     externalSignal?.addEventListener('abort', abort, { once: true });
@@ -97,7 +107,7 @@ export function createService(api, { fetchImpl = globalThis.fetch } = {}) {
       const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', payload))].map(n => n.toString(16).padStart(2, '0')).join('');
       return { digest };
     }
-    if (message.type === 'STATUS') return publicStatus(await read());
+    if (message.type === 'STATUS') { if (isXSender(sender)) xTabs.add(sender.tab.id); return publicStatus(await read()); }
     if (message.type === 'SETTINGS_GET') { requireTrusted(sender); return read(); }
     if (message.type === 'SETTINGS_EDIT') {
       requireTrusted(sender);
@@ -151,7 +161,7 @@ export function createService(api, { fetchImpl = globalThis.fetch } = {}) {
       const result = await translate('Hello, world!', settings, { fetchImpl, onProgress() {} });
       return { ...result, elapsedMs: Date.now() - start };
     }
-    const channel = channelFor(sender);
+    const channel = channelFor(sender, message);
     if (message.type === 'CANCEL') {
       const previous = active.get(channel);
       if (previous?.id === message.requestId) previous.controller.abort();
@@ -246,5 +256,5 @@ export function createService(api, { fetchImpl = globalThis.fetch } = {}) {
     try { await browser.contextClicked(info, tab); await entryErrors.success(tab.id, attempt); }
     catch (error) { await entryErrors.report(error, info, tab, attempt); }
   }
-  return { handle, connect, captureChanged: browser.captureChanged, contextClicked, forgetTab(tabId) { active.get(String(tabId))?.controller.abort(); browser.forgetTab(tabId); entryErrors.forget(tabId); } };
+  return { handle, connect, captureChanged: browser.captureChanged, contextClicked, forgetTab(tabId) { for (const entry of active.values()) if (entry.tabId === tabId) entry.controller.abort(); xTabs.delete(tabId); browser.forgetTab(tabId); entryErrors.forget(tabId); } };
 }

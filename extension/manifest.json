@@ -42,12 +42,14 @@
         "https://*/*"
       ],
       "js": [
+        "lib/errors-shared.js",
         "lib/page-shared.js",
         "lib/image-format.js",
         "lib/panel.js",
         "lib/image-entry.js",
         "lib/capture.js",
-        "content.js"
+        "content.js",
+        "lib/x-translation.js"
       ],
       "run_at": "document_idle",
       "all_frames": true
