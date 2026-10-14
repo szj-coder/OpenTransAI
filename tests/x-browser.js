@@ -44,10 +44,11 @@ async function reset(nodes = [post()]) {
 }
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
-test('所有文字帖子都有入口，原生控件后同排追加，无控件时在正文上方', async () => {
+test('所有文字帖子都有入口，原生翻译和设置齿轮后同排追加，无控件时在正文上方', async () => {
   const [a, b] = await reset([post(), post({ id: '101', native: false })]);
   check(button(a) && button(b), '文字帖子缺少 OpenTransAI 入口');
-  check(entry(a).previousElementSibling === a.querySelector('[data-testid=translateTweet]') && entry(a).nextElementSibling?.textContent === '⚙', '入口没有紧跟原生翻译按钮');
+  const native = a.querySelector('[data-testid=translateTweet]'), gear = a.querySelector('[aria-label="翻译设置"]');
+  check(native.nextElementSibling === gear && gear.nextElementSibling === entry(a), '入口没有放在原生翻译和设置齿轮之后');
   check(entry(b).nextElementSibling === body(b), '无原生控件入口未在正文上方');
 });
 test('点击等待保留原文，验证完成后切换，再点恢复完整原节点和缓存', async () => {
@@ -178,11 +179,12 @@ test('原生按钮与正文同一容器时仍在原生按钮之后，动态加�
   check(control.nextElementSibling === entry(a), '原生按钮在正文后时入口仍留在正文上方');
   check(a.querySelectorAll('[data-opentransai-x-entry]').length === 1, '移动入口产生重复按钮');
 });
-test('译文完成后的控件重排会归位，恢复原文及缓存切换保持原生按钮在前', async () => {
-  const [a] = await reset(), native = a.querySelector('[data-testid=translateTweet]');
+test('译文完成后的控件重排会归位，恢复原文及缓存切换保持原生翻译和齿轮在前', async () => {
+  const [a] = await reset(), native = a.querySelector('[data-testid=translateTweet]'), gear = a.querySelector('[aria-label="翻译设置"]');
   const ordered = () => {
-    check(native.nextElementSibling === entry(a), '入口跑到原生翻译按钮之前');
-    const first = native.getBoundingClientRect(), second = button(a).getBoundingClientRect();
+    const anchor = gear.isConnected ? gear : native;
+    check(anchor.nextElementSibling === entry(a) && (!gear.isConnected || native.nextElementSibling === gear), '入口没有跟在完整的原生控件之后');
+    const first = anchor.getBoundingClientRect(), second = button(a).getBoundingClientRect();
     check(second.left >= first.right && Math.abs(second.top - first.top) < 1, '按钮可见顺序或同行位置错误');
   };
   button(a).click(); await delay(60); ordered();
@@ -193,12 +195,14 @@ test('译文完成后的控件重排会归位，恢复原文及缓存切换保�
   native.before(entry(a)); button(a).click();
   check(!body(a).hidden, '未恢复原文'); ordered();
   button(a).click(); await delay(60); check(result(a) && ports.length === 1, '未复用缓存译文'); ordered();
+  gear.remove(); await delay(100); ordered();
+  native.parentElement.append(gear); await delay(100); ordered();
 });
 test('原生控件暂时重绘标签及重建后补充 aria-label，译文入口仍跟随原生控件', async () => {
   const a = post(), native = a.querySelector('[data-testid=translateTweet]'); native.removeAttribute('data-testid');
   await reset([a]); button(a).click(); await delay(60); ports[0].done(); await delay(60);
   native.textContent = ''; await delay(100);
-  check(native.nextElementSibling === entry(a), '原生控件标签重绘期间入口退回正文上方');
+  check(a.querySelector('[aria-label="翻译设置"]').nextElementSibling === entry(a), '原生控件标签重绘期间入口未保持在齿轮后面');
   native.setAttribute('aria-label', '显示翻译'); await delay(100);
   const row = document.createElement('div'), replacement = document.createElement('button'); row.className = 'controls'; row.append(replacement);
   native.parentElement.replaceWith(row); await delay(100);

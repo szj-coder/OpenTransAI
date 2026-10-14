@@ -161,7 +161,9 @@
       const compactRow = parent && !parent.contains(record.body) && parent.querySelectorAll('button,[role="button"]').length <= 3 && !parent.querySelector(`${TEXT},time`);
       if (record.row && (!compactRow || record.row.node !== parent)) restoreRow(record);
       if (native) {
-        if (native.nextElementSibling !== record.host) native.after(record.host);
+        // Keep X's translation button and settings gear together, ahead of our entry.
+        const anchor = compactRow ? [...parent.children].findLast(node => !owned(node)) : native;
+        if (anchor.nextElementSibling !== record.host) anchor.after(record.host);
         if (compactRow && !record.row) {
           const applied = { display: 'flex', 'flex-direction': 'row', 'flex-wrap': 'wrap', 'align-items': 'center' };
           record.row = { node: parent, applied, saved: Object.keys(applied).map(name => [name, parent.style.getPropertyValue(name), parent.style.getPropertyPriority(name)]) };
