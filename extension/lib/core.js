@@ -16,7 +16,7 @@ export const PROVIDERS = {
 };
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  provider: 'openai', ...PROVIDERS.openai, apiKey: '', defaultLanguage: 'zh-CN', enabled: true, thinking: false,
+  provider: 'openai', ...PROVIDERS.openai, apiKey: '', defaultLanguage: 'zh-CN', enabled: true,
 });
 export const MAX_TEXT_LENGTH = 12000;
 const fail = (message, code = 'FORMAT', diagnostic) => {
@@ -55,7 +55,6 @@ export function validateSettings(raw, { requireKey = true } = {}) {
   const configFail = message => fail(message, 'CONFIG');
   if (!raw || !Object.hasOwn(PROVIDERS, raw.provider)) configFail('请选择支持的 AI 服务。');
   if (!Object.hasOwn(LANGUAGES, raw.defaultLanguage)) configFail('请选择默认语言。');
-  if (raw.thinking !== undefined && typeof raw.thinking !== 'boolean') configFail('无效的思考模式开关。');
   const model = typeof raw.model === 'string' ? raw.model.trim() : '';
   const apiKey = typeof raw.apiKey === 'string' ? raw.apiKey.trim() : '';
   if (!model || model.length > 200 || /[\s?#]/.test(model)) configFail('请填写有效的模型名称。');
@@ -67,11 +66,11 @@ export function validateSettings(raw, { requireKey = true } = {}) {
   if (url.username || url.password || url.search || url.hash) configFail('API 地址不能包含账号、密码、查询参数或片段，请将 Key 填入专用字段。');
   return {
     provider: raw.provider, defaultLanguage: raw.defaultLanguage, model, apiKey,
-    baseUrl: url.href.replace(/\/+$/, ''), enabled: raw.enabled !== false, thinking: raw.thinking === true,
+    baseUrl: url.href.replace(/\/+$/, ''), enabled: raw.enabled !== false,
   };
 }
 
-export function supportsThinking({ provider, baseUrl }) {
+function isDeepSeek({ provider, baseUrl }) {
   if (!['openai', 'deepseek', 'custom'].includes(provider)) return false;
   try { return new URL(baseUrl).origin === 'https://api.deepseek.com'; }
   catch { return false; }
@@ -163,7 +162,7 @@ export function buildRequest(rawSettings, text, { stream = false, targetLanguage
     url: appendPath(baseUrl, '/chat/completions'),
     headers: { ...headers, Authorization: `Bearer ${apiKey}` },
     body: { model, stream, messages: [{ role: 'system', content: system }, { role: 'user', content }],
-      ...(supportsThinking(settings) ? { thinking: { type: settings.thinking ? 'enabled' : 'disabled' } } : {}),
+      ...(isDeepSeek(settings) ? { thinking: { type: 'disabled' } } : {}),
     },
   };
 }
@@ -251,7 +250,7 @@ export async function translate(text, rawSettings, { fetchImpl = globalThis.fetc
   let phaseIndex = -1;
   const phase = value => {
     if (controller.signal.aborted) throw controller.signal.reason;
-    const index = ['waiting', 'thinking', 'translating'].indexOf(value);
+    const index = ['waiting', 'translating'].indexOf(value);
     if (index > phaseIndex) { phaseIndex = index; onPhase?.(value); }
     if (controller.signal.aborted) throw controller.signal.reason;
   };
@@ -371,8 +370,6 @@ function recognitionRequest(settings, image) {
   } else {
     request.body.messages[0].content = recognitionPrompt;
     request.body.messages[1].content = [{ type: 'image_url', image_url: { url: image.dataUrl } }, { type: 'text', text: 'Recognize visible text only.' }];
-    // OCR is complete JSON, never a reasoning/streaming request.
-    if (supportsThinking(settings)) request.body.thinking = { type: 'disabled' };
   }
   return request;
 }

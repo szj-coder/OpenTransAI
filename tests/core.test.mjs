@@ -41,14 +41,15 @@ test('OpenAI 兼容地址不重复拼接，并将选区作为数据隔离', () =
   assert.equal(req.body.stream, false);
 });
 
-test('思考设置默认关闭、保存布尔值，只为 DeepSeek 官方兼容接口添加参数', () => {
-  assert.equal(validateSettings(config()).thinking, false);
-  assert.equal(validateSettings(config({ thinking: true })).thinking, true);
-  assert.throws(() => validateSettings(config({ thinking: 'false' })), /思考/);
+test('移除思考配置并忽略旧值，DeepSeek 官方兼容接口固定关闭思考', () => {
+  assert.equal('thinking' in DEFAULT_SETTINGS, false);
+  for (const thinking of [undefined, false, true, 'false']) {
+    assert.equal('thinking' in validateSettings(config({ thinking })), false);
+  }
   for (const provider of ['openai', 'deepseek', 'custom']) {
     for (const thinking of [false, true]) {
       const req = buildRequest(config({ provider, baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-flash', thinking }), 'hello', { stream: true });
-      assert.deepEqual(req.body.thinking, { type: thinking ? 'enabled' : 'disabled' });
+      assert.deepEqual(req.body.thinking, { type: 'disabled' });
       assert.equal(req.body.stream, true);
     }
   }

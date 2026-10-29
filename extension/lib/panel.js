@@ -87,7 +87,7 @@
       }
       position.x = Math.max(v.left + 12, Math.min(position.x, v.left + v.width - width - 12)); position.y = Math.max(v.top + 12, Math.min(position.y, v.top + v.height - height - 12)); layer.move(position.x, position.y);
     }
-    const labels = { reading: '正在读取图片…', recognizing: '正在识别图片文字…', translating: '正在翻译…', waiting: '正在翻译…', thinking: '模型正在思考…', switching: '正在切换语言…', ready: 'AI 译文', cancelled: '已取消 · 内容可能未完成', empty: '未识别到可翻译的文字', 'same-language': '图片文字已是目标语言', error: '暂时无法完成翻译' };
+    const labels = { reading: '正在读取图片…', recognizing: '正在识别图片文字…', translating: '正在翻译…', waiting: '正在翻译…', switching: '正在切换语言…', ready: 'AI 译文', cancelled: '已取消 · 内容可能未完成', empty: '未识别到可翻译的文字', 'same-language': '图片文字已是目标语言', error: '暂时无法完成翻译' };
     function render(next) {
       const previousText = renderedTranslation; task = next;
       source.textContent = A.label(next.recognized?.sourceLanguage || next.sourceLanguage);

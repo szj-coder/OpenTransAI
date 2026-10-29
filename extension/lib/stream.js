@@ -117,8 +117,6 @@ export async function streamResponse(response, provider, { signal, activity, pro
       const choice = data.choices?.[0];
       if (choice?.finish_reason === 'length') fail('译文被模型截断，请缩小选区后重试。');
       if (choice?.finish_reason && choice.finish_reason !== 'stop') fail('AI 未能完成翻译，请更换模型或重试。');
-      // Only expose the phase, never forward or store raw reasoning text.
-      if (typeof choice?.delta?.reasoning_content === 'string' && choice.delta.reasoning_content.length) phase('thinking');
       delta = choice?.delta?.content ?? '';
     }
     if (typeof delta !== 'string') fail('AI 流式内容格式不正确。');

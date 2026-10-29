@@ -1,4 +1,4 @@
-import { LANGUAGES, DEFAULT_SETTINGS, validateSettings, permissionOrigin, supportsThinking } from './lib/core.js';
+import { LANGUAGES, DEFAULT_SETTINGS, validateSettings, permissionOrigin } from './lib/core.js';
 import { send, notice } from './lib/client.js';
 import { showEntryDialog } from './lib/entry-dialog.js';
 
@@ -61,7 +61,6 @@ document.querySelector('.diagnostics-link').addEventListener('click', event => {
     .catch(() => notice(message, '无法打开诊断日志，请重新加载扩展后重试。', 'error'));
 });
 let serviceProvider = 'openai';
-let thinkingPreference = false;
 let enabled = true;
 let busy = false;
 let savedForm, configRevision, draftVersion = 0;
@@ -70,11 +69,11 @@ for (const [value, label] of Object.entries(LANGUAGES)) language.add(new Option(
 const protocolFor = value => ['openai', 'deepseek', 'custom'].includes(value) ? 'openai' : value;
 
 function readForm() {
-  return { provider: serviceProvider, baseUrl: $('base-url').value, model: $('model').value, apiKey: $('api-key').value, defaultLanguage: language.value, enabled, thinking: !$('thinking').disabled && $('thinking').checked };
+  return { provider: serviceProvider, baseUrl: $('base-url').value, model: $('model').value, apiKey: $('api-key').value, defaultLanguage: language.value, enabled };
 }
 function readDraft() {
   const { enabled: _enabled, ...draft } = readForm();
-  return { ...draft, thinking: thinkingPreference };
+  return draft;
 }
 function setBusy(value) {
   busy = value; fields.disabled = value; $('enabled').disabled = value; $('discard-draft').disabled = value;
@@ -85,34 +84,18 @@ function draftNotice(text) {
   $('discard-draft').hidden = !text;
   $('draft-notice').textContent = text;
 }
-function updateThinkingControl() {
-  const supported = supportsThinking({ provider: serviceProvider, baseUrl: $('base-url').value });
-  $('thinking').disabled = !supported;
-  $('thinking').checked = supported && thinkingPreference;
-  $('thinking-hint').textContent = supported
-    ? ($('thinking').checked ? '开启思考 · 可能增加等待时间' : '关闭思考 · 优先快速翻译')
-    : '思考开关目前支持 DeepSeek 官方接口';
-}
 function showService(settings) {
   serviceProvider = settings.provider;
   provider.value = protocolFor(settings.provider);
   $('base-url').value = settings.baseUrl;
   $('model').value = settings.model;
   $('api-key').value = settings.apiKey;
-  thinkingPreference = settings.thinking === true;
-  updateThinkingControl();
   $('api-key').type = 'password';
   $('reveal').textContent = '显示';
   $('reveal').setAttribute('aria-pressed', 'false');
 }
 provider.addEventListener('change', () => {
   serviceProvider = provider.value;
-  updateThinkingControl();
-});
-$('base-url').addEventListener('input', updateThinkingControl);
-$('thinking').addEventListener('change', () => {
-  thinkingPreference = $('thinking').checked;
-  updateThinkingControl();
 });
 function markDirty() {
   notice(message, '');

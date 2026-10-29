@@ -65,7 +65,7 @@ test('已开始的流停止传输也会超时并取消 reader', async () => {
   assert.equal(cancelled, true);
 });
 
-test('阶段由真实思考和正文事件驱动，去重且不暴露内部推理文本', async () => {
+test('推理事件不产生阶段或译文，正文阶段去重且不暴露内部推理文本', async () => {
   const phases = [], updates = [];
   const thought = event({ choices: [{ delta: { reasoning_content: 'PRIVATE_REASONING_ONLY' } }] });
   const wire = thought + thought + events('openai', raw);
@@ -73,23 +73,23 @@ test('阶段由真实思考和正文事件驱动，去重且不暴露内部推�
     onPhase: value => phases.push(value), onProgress: value => updates.push(value),
     fetchImpl: async () => response(wire),
   });
-  assert.deepEqual(phases, ['waiting', 'thinking', 'translating']);
+  assert.deepEqual(phases, ['waiting', 'translating']);
   assert.deepEqual(actual, result);
   assert.equal(JSON.stringify({ phases, updates, actual }).includes('PRIVATE_REASONING_ONLY'), false);
 });
 
-test('没有思考事件时不伪造思考阶段，取消后不发送后续状态', async () => {
+test('仅发送等待和翻译阶段，取消后不发送后续状态', async () => {
   const phases = [];
   await translate('hello', settings, { onPhase: value => phases.push(value), onProgress() {}, fetchImpl: async () => response(events('openai', raw)) });
   assert.deepEqual(phases, ['waiting', 'translating']);
   const controller = new AbortController(), cancelledPhases = [];
   await assert.rejects(translate('hello', settings, {
     signal: controller.signal,
-    onPhase(value) { cancelledPhases.push(value); if (value === 'thinking') controller.abort(); },
+    onPhase(value) { cancelledPhases.push(value); if (value === 'translating') controller.abort(); },
     onProgress() { assert.fail('取消后仍更新译文'); },
     fetchImpl: async () => response(event({ choices: [{ delta: { reasoning_content: 'private' } }] }) + events('openai', raw)),
   }), /取消/);
-  assert.deepEqual(cancelledPhases, ['waiting', 'thinking']);
+  assert.deepEqual(cancelledPhases, ['waiting', 'translating']);
 });
 
 test('显式目标流式请求保留目标方向和已知混合源语言', async () => {

@@ -371,7 +371,7 @@ document.getElementById('run-tests').onclick = async () => {
       set('model', 'demo-model');
       set('api-key', 'demo-key-not-valid');
       set('default-language', 'ja', 'change');
-      field('thinking').click();
+      assert(!field('thinking') && !field('thinking-hint'), '配置页仍保留思考模式');
       const retained = model => {
         assert(field('base-url').value === 'https://api.deepseek.com', '切换协议清空或替换了 API 地址');
         assert(field('model').value === model, '切换协议清空或恢复了旧模型');
@@ -380,8 +380,7 @@ document.getElementById('run-tests').onclick = async () => {
       };
       for (const protocol of ['anthropic', 'gemini', 'openai']) {
         set('provider', protocol, 'change'); retained('demo-model');
-        assert(field('thinking').disabled === (protocol !== 'openai'), '思考开关适用范围错误');
-        assert(field('thinking').checked === (protocol === 'openai'), '往返切换丢失思考偏好或错误启用思考');
+        assert(!field('thinking'), '切换协议后恢复了思考开关');
       }
       set('provider', 'anthropic', 'change');
       set('model', 'updated-demo-model');
@@ -391,7 +390,7 @@ document.getElementById('run-tests').onclick = async () => {
       assert(frame.contentDocument.getElementById('popup-preview-closed'), '保存未成功关闭配置');
       await load(); retained('updated-demo-model');
       assert(field('provider').value === 'gemini', '保存了旧协议');
-      assert(field('thinking').disabled && !field('thinking').checked, '不支持的协议保存了思考开关');
+      assert(!field('thinking'), '重新打开配置后恢复了思考开关');
     } finally {
       frame.remove();
       if (previous === null) sessionStorage.removeItem(storageKey);

@@ -24,7 +24,7 @@ function fixture() {
   const makeService = () => createService(api, { fetchImpl: async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ sourceLanguage: 'en', targetLanguage: 'zh-CN', translation: '你好' }) } }] })) });
   return { service: makeService(), makeService, local, session, access: () => access, deny: () => { allowed = false; }, failWrites: value => { writesFail = value; }, failRemoval: () => { removalsFail = true; } };
 }
-const draft = { provider: 'openai', baseUrl: 'https://unfinished.', model: '', apiKey: 'draft-fixture-key', defaultLanguage: 'pt', thinking: true };
+const draft = { provider: 'openai', baseUrl: 'https://unfinished.', model: '', apiKey: 'draft-fixture-key', defaultLanguage: 'pt' };
 const saveDraft = (service, value = draft, configRevision = 'initial') => service.handle({ type: 'SETTINGS_DRAFT_SAVE', draft: value, configRevision }, sender);
 
 test('incomplete draft survives worker recreation without changing active settings or exposing it to a page', async () => {
@@ -77,12 +77,24 @@ test('draft storage failure is reported and later edits can still be saved', asy
 });
 
 
-test('draft validation bounds secret fields and ignores unrelated data', async () => {
+test('draft validation bounds secret fields and ignores unrelated data and legacy thinking', async () => {
   const h = fixture();
   for (const invalid of [{ ...draft, apiKey: 'x'.repeat(2001) }, { ...draft, baseUrl: 'x'.repeat(2049) }, { ...draft, defaultLanguage: 'invalid' }]) {
     await assert.rejects(saveDraft(h.service, invalid), /无效/);
   }
-  await saveDraft(h.service, { ...draft, enabled: false, extra: 'ignored' });
+  await saveDraft(h.service, { ...draft, enabled: false, extra: 'ignored', thinking: true });
   const edit = await h.service.handle({ type: 'SETTINGS_EDIT' }, sender);
   assert.deepEqual(edit.draft, draft); assert.equal(edit.settings.enabled, true);
+});
+
+test('legacy settings and restored drafts discard thinking without losing other fields', async () => {
+  const h = fixture();
+  h.local.settings.thinking = true;
+  h.session.settingsDraft = { configRevision: 'initial', draft: { ...draft, thinking: true } };
+  const edit = await h.service.handle({ type: 'SETTINGS_EDIT' }, sender);
+  assert.equal('thinking' in edit.settings, false);
+  assert.equal(edit.settings.apiKey, 'saved-fixture-key');
+  assert.deepEqual(edit.draft, draft);
+  await h.service.handle({ type: 'SET_ENABLED', enabled: false }, sender);
+  assert.equal('thinking' in h.local.settings, false);
 });

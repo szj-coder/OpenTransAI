@@ -15,7 +15,8 @@ export function createService(api, { fetchImpl = globalThis.fetch } = {}) {
   const read = async () => {
     const values = await api.storage.local.get(['settings', 'configurationRevision']);
     configRevision = values.configurationRevision || 'legacy';
-    return { ...DEFAULT_SETTINGS, ...values.settings };
+    const { thinking: _thinking, ...settings } = values.settings || {};
+    return { ...DEFAULT_SETTINGS, ...settings };
   };
   let writes = Promise.resolve();
   const enqueueWrite = operation => {
@@ -116,7 +117,8 @@ export function createService(api, { fetchImpl = globalThis.fetch } = {}) {
         let stored, draftUnavailable = false;
         try { stored = (await (await draftStorage()).get('settingsDraft')).settingsDraft; }
         catch { draftUnavailable = true; }
-        return { settings, configRevision, draft: stored?.configRevision === configRevision ? stored.draft : null, draftUnavailable };
+        const { thinking: _thinking, ...draft } = stored?.draft || {};
+        return { settings, configRevision, draft: stored?.configRevision === configRevision ? draft : null, draftUnavailable };
       });
     }
     if (message.type === 'SETTINGS_DRAFT_SAVE') {
@@ -125,9 +127,9 @@ export function createService(api, { fetchImpl = globalThis.fetch } = {}) {
       let draft = null;
       if (raw !== null) {
         if (!raw || !['openai', 'deepseek', 'custom', 'anthropic', 'gemini'].includes(raw.provider) ||
-            !Object.hasOwn(LANGUAGES, raw.defaultLanguage) || typeof raw.thinking !== 'boolean' ||
+            !Object.hasOwn(LANGUAGES, raw.defaultLanguage) ||
             Object.entries({ baseUrl: 2048, model: 200, apiKey: 2000 }).some(([key, limit]) => typeof raw[key] !== 'string' || raw[key].length > limit)) throw new Error('无效配置草稿。');
-        draft = Object.fromEntries(['provider', 'baseUrl', 'model', 'apiKey', 'defaultLanguage', 'thinking'].map(key => [key, raw[key]]));
+        draft = Object.fromEntries(['provider', 'baseUrl', 'model', 'apiKey', 'defaultLanguage'].map(key => [key, raw[key]]));
       }
       return enqueueWrite(async () => {
         await read();

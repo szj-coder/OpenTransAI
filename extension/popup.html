@@ -30,9 +30,8 @@
           <input id="base-url" name="baseUrl" type="url" placeholder="https://api.example.com/v1" required autocomplete="off" spellcheck="false" maxlength="2048">
         </div>
         <div class="field">
-          <div class="model-label-row"><label for="model">模型</label><label class="thinking-label" for="thinking">思考模式<input id="thinking" type="checkbox" class="toggle" role="switch" aria-describedby="thinking-hint"></label></div>
+          <label for="model">模型</label>
           <input id="model" name="model" placeholder="填写 API 服务商提供的模型 ID" required autocomplete="off" spellcheck="false" maxlength="200">
-          <p id="thinking-hint" class="field-hint">思考开关目前支持 DeepSeek 官方接口</p>
           <p class="field-hint">图片发送至此 API，由当前模型识别（需支持视觉）。连接测试仅验证文本翻译。</p>
         </div>
         <div class="field">

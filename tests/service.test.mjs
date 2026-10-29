@@ -172,7 +172,7 @@ test('翻译端口仅接受翻译一次，不能读取设置或替换 Key', asyn
   assert(!JSON.stringify(port.sent).includes('private-key'));
 });
 
-test('保存并重读思考开关，翻译仅采用保存值，阶段消息不含推理文本', async () => {
+test('保存时丢弃旧思考配置，翻译固定关闭思考且阶段消息不含推理文本', async () => {
   let thinking;
   const result = { sourceLanguage: 'en', targetLanguage: 'zh-CN', translation: '你好' };
   const { service } = setup({ fetchImpl: async (_url, init) => {
@@ -182,12 +182,12 @@ test('保存并重读思考开关，翻译仅采用保存值，阶段消息不�
   } });
   const settings = { ...DEFAULT_SETTINGS, baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash', apiKey: 'private-key', thinking: true };
   await service.handle({ type: 'SETTINGS_SAVE', settings }, optionsSender);
-  assert.equal((await service.handle({ type: 'SETTINGS_GET' }, optionsSender)).thinking, true);
+  assert.equal('thinking' in (await service.handle({ type: 'SETTINGS_GET' }, optionsSender)), false);
   const port = mockPort(); service.connect(port);
   port.receive({ type: 'TRANSLATE', requestId: 'thinking', text: 'hello', settings: { thinking: false } });
   await new Promise(resolve => setTimeout(resolve, 30));
-  assert.deepEqual(thinking, { type: 'enabled' });
-  assert.deepEqual(port.sent.filter(item => item.type === 'PHASE').map(item => item.phase), ['waiting', 'thinking', 'translating']);
+  assert.deepEqual(thinking, { type: 'disabled' });
+  assert.deepEqual(port.sent.filter(item => item.type === 'PHASE').map(item => item.phase), ['waiting', 'translating']);
   assert.equal(port.sent.at(-1).type, 'DONE');
   assert.equal(JSON.stringify(port.sent).includes('PRIVATE_REASONING_ONLY'), false);
   assert.equal(JSON.stringify(port.sent).includes('private-key'), false);
